@@ -180,9 +180,35 @@ and waiting. Everything else in Track U is drafted as its step comes up.
 
 ### Wave C — Commerce completion (written now, live on U2)
 
-- [ ] **S9. Backoffice Orders admin.** List, detail, guided status transitions via the
-      existing `LIFECYCLE_ACTIONS_BY_SCHEMA` registry, and the manual payment-confirmation
-      screen §6.1/§6.3 requires in place of a webhook receiver.
+- [x] **S9. Backoffice Orders admin.** `lib/blocks/orders.ts` + `pages/OrdersPage.tsx` +
+      a nav entry and route. List with status/payment/order-number filters and paging, a
+      detail drawer with line snapshots, totals and shipping address, and the staff actions.
+
+      Deliberately **not** built on `ResourceListPage`/`createEntityApi` like every other
+      entity: those read their shape from the generated `schema-meta.ts`, which has no `Order`
+      in it and must not until the schema is live. Hand-written GraphQL instead, so it starts
+      working the moment the import lands with no regeneration step. With the flag off the
+      screen exists and explains what it's waiting for rather than 404ing.
+
+      **This is where `commitStock` finally gets called** — the half S5 deliberately left out.
+      Marking an order shipped finds the reservation it's holding, commits that stock
+      (on-hand drops, availability unchanged because it was already spoken for), settles the
+      reservation and records the fulfilment. Cancelling releases instead. Payment
+      confirmation is a staff action against the provider's own dashboard, because the
+      platform can't receive a webhook — the §6.1/§6.3 mitigation, admin-gated as a money
+      decision.
+
+      Two orderings chosen the same way as everywhere else in this wave: **stock before order**
+      on fulfilment (a half-committed ship leaves the order un-shipped and reported, rather
+      than shipped with quietly wrong balances) and **release before cancel** (the worst case
+      is an order that still reads open, not one silently holding stock nobody will collect).
+
+      *Runtime-blocked on U1 + U2.* Verified: `npm run verify:orders` — 41 assertions across
+      12 scenarios, including another customer's reservation never being consumed, a
+      different order's reservation never being consumed, a failed commit leaving the order
+      un-shipped, and shipping twice not consuming stock twice. Removing the order-match
+      condition makes two of them fail, checked rather than assumed.
+
 - [ ] **S10. Storefront customer account area.** `/account`, `/orders`, `/orders/:id`,
       `/addresses`, `/profile` — none of these routes exist today.
 - [ ] **S11. Saved-address picker at checkout** (today: prefill from the last saved address

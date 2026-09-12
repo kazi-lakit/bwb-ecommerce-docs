@@ -274,8 +274,14 @@ plan, role model, shared inventory module. Status against what's actually there:
       (storefront needs to render these unauthenticated), with a client-side size/type check
       as a courtesy since the platform itself doesn't enforce one yet. No flag needed — the
       Storage service is live today, unlike the drafted Commerce schemas.
-- [ ] No Orders/Commerce admin screens (nothing exists to administer yet — depends on the
-      Commerce schemas above existing first).
+- [x] **Orders admin — built** (`pages/OrdersPage.tsx`, `lib/blocks/orders.ts`, sequence step
+      S9). List with filters and paging, detail drawer with line snapshots and totals, manual
+      payment confirmation (the platform can't receive a PSP webhook, so a staff member
+      reconciles and records it — §6.1/§6.3), fulfilment that **commits the reserved stock**,
+      and cancellation that releases it. Hand-written GraphQL rather than the generic resource
+      machinery, so no `schema-meta.ts` regeneration is needed before the schema is live.
+      Gated on `VITE_COMMERCE_SCHEMAS_LIVE`; the screen shows what it's waiting for until then.
+      Covered by `npm run verify:orders` (41 assertions).
 - [ ] No bulk import/export.
 - [x] Permission-gated UI — see Phase 0 above. Currently scoped to Edit/Delete actions on
       the entity tables; nav-level/route-level gating and finer-grained per-resource
