@@ -324,8 +324,26 @@ and waiting. Everything else in Track U is drafted as its step comes up.
       stored values, and that the fetch filter uses an `or` of `eq` clauses rather than an
       assumed `ItemId: { in: [...] }`.
 
-- [ ] **S16. Embedded variant editor inside the Product form** (variants are a wholly separate
-      screen today).
+- [x] **S16. Embedded variant editor inside the Product form.** `product-variants-panel.tsx`,
+      rendered through a new `extraSections` slot on `ResourceForm`. Adding a size to a product
+      meant leaving the product you were editing, creating a variant on a separate screen, and
+      hand-typing its `ProductId` — a foreign key nobody should be asked to copy. It's now
+      listed, added, edited and deleted in place, with `ProductId` stamped by the panel and
+      hidden from the form.
+
+      **Edit mode only, deliberately.** A variant points at a product by id and a product being
+      created hasn't got one yet. Collecting variants during create and inserting them after
+      the product insert returns would be a multi-document write with no transaction behind it
+      — the same constraint that shapes all the inventory work — and a failure partway would
+      leave a product with some of its variants and no signal which. The form says to save
+      first rather than showing a disabled panel that reads as broken.
+
+      **The trap this hid:** the add/edit form reuses `ResourceForm`, which renders a `<form>`
+      — and a `<form>` inside a `<form>` is invalid HTML. The browser silently drops the inner
+      element, so the variant's fields would have joined the product form and its Save would
+      have submitted *the product*, with no error anywhere. `ResourceForm` gained a `nested`
+      mode that renders a container instead and wires submit to the button directly.
+
 - [ ] **S17. Low-stock / out-of-stock surfacing in the backoffice** — bounded client-side per
       warehouse, since the Data Gateway still can't aggregate. *Runtime-blocked on U1*, which
       is what makes `AvailableToSell` trustworthy.

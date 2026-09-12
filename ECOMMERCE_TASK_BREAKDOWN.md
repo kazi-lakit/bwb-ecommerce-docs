@@ -267,8 +267,13 @@ plan, role model, shared inventory module. Status against what's actually there:
       `src/components/layout/nav-items.ts:55`. CRUD works if you know the URL; no discoverable
       entry point. **Fixed** — added back to `ADMIN_NAV_ITEMS` with a `Layers` icon and
       "Variants" label.
-- [ ] No embedded variant editor inside the Product form — variants are a fully separate
-      screen, not a natural "add variants to this product" flow.
+- [x] **Embedded variant editor — built** (sequence step S16). `product-variants-panel.tsx`
+      inside the Product drawer via a new `extraSections` slot on `ResourceForm`: list, add,
+      edit and delete a product's variants in place, with `ProductId` stamped automatically
+      and hidden from the form. Edit mode only — a variant needs a product that exists, and
+      inserting variants after a create would be a multi-document write with no transaction.
+      Required a `nested` mode on `ResourceForm`, since a `<form>` inside a `<form>` is
+      invalid HTML and would have made the variant's Save submit the product instead.
 - [x] **No product image upload — fixed.** `Media.Url` was a hand-typed string field; now
       `sub-field-input.tsx` renders a real upload control (`image-upload-field.tsx`) for it
       specifically, backed by `lib/blocks/storage.ts`'s `uploadProductImage()` (presign → PUT
