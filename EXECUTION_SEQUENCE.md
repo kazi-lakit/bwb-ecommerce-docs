@@ -303,7 +303,27 @@ and waiting. Everything else in Track U is drafted as its step comes up.
       including that navigating between pages replaces rather than duplicates tags, and that
       unmounting restores the title without stripping the baseline metadata.
 
-- [ ] **S15. Recently-viewed and basic recommendations.**
+- [x] **S15. Recently-viewed and recommendations.** `lib/recently-viewed.ts` — per-browser,
+      localStorage, anonymous, capped at 12, surviving disabled storage and corrupt values
+      because a browsing convenience is never worth breaking a page over. Rails on the home
+      page and the product page, both rendering nothing on a first visit.
+
+      **This turned up something worth fixing rather than adding around.** The product page
+      already had two rails — "Perfect Match with Your Furniture" and "Customer also Viewed
+      these items" — and both were fed from the *same* category-related list, arbitrarily
+      split at index 5. The second was a claim about other customers' behaviour that nothing
+      in the app tracked or could have tracked. They're now one rail saying what it is
+      ("More in {category}"), plus a real "Recently viewed" built from actual view history.
+
+      Kept anonymous and client-side on purpose: it works for signed-out visitors, who are
+      most of them, and no behavioural history accumulates server-side for a UI nicety. Making
+      it follow you between devices means putting view history on `CommerceCustomer`, which is
+      a deliberate decision about storing behavioural data, not a side effect of a rail.
+
+      Verified: 18 assertions — ordering, dedupe-to-front, the cap, disabled storage, corrupt
+      stored values, and that the fetch filter uses an `or` of `eq` clauses rather than an
+      assumed `ItemId: { in: [...] }`.
+
 - [ ] **S16. Embedded variant editor inside the Product form** (variants are a wholly separate
       screen today).
 - [ ] **S17. Low-stock / out-of-stock surfacing in the backoffice** — bounded client-side per

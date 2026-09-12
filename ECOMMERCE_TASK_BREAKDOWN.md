@@ -365,7 +365,11 @@ plan, role model, shared inventory module. Status against what's actually there:
 - [ ] No search suggestions.
 - [ ] No delivery/pickup ETA logic (static copy only).
 - [ ] No reviews/ratings — no schema, no UI.
-- [ ] No recommended/recently-viewed tracking.
+- [x] **Recently-viewed — built** (sequence step S15). `lib/recently-viewed.ts`, per-browser
+      and anonymous, with rails on the home and product pages. Also **removed a false claim**:
+      the product page's "Customer also Viewed these items" rail was the same category list as
+      the rail above it, split at index 5, describing behaviour nothing tracked. Now one
+      honestly-labelled category rail plus a real view-history rail.
 - [ ] No real tax calculation (flat `DELIVERY_CHARGE = 120` constant) or shipping-rate logic.
 - [x] **Customer account area — built** (sequence step S10). `/account/orders`,
       `/account/orders/:orderId`, `/account/addresses`, `/account/profile`, behind a
