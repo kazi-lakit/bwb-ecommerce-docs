@@ -246,7 +246,21 @@ and waiting. Everything else in Track U is drafted as its step comes up.
 
 ### Wave D — Catalog and storefront depth (no dependencies)
 
-- [ ] **S12. Brand pages.** The `Brand` schema has generated metadata and zero call sites.
+- [x] **S12. Brand pages.** `/brands` and `/brand/:slug`, a `?brand=` filter on the listing
+      page, a brand link on every product detail page, and a nav entry. The `Brand` schema has
+      been fully manageable in the backoffice since the start with **zero** storefront surface
+      — products showed a brand's other products only by accident of search.
+
+      Brand resolved by slug, matching `/product/:slug`, so URLs stay shareable. Inactive
+      brands are hidden, but a brand with no status set is treated as visible — hiding it
+      would look like data loss. The PDP's brand lookup only fires for products that have one.
+
+      Two things this turned up: the header's active-state check silently resolved `location`
+      to `window.location`, which typechecks and works on first paint but never re-renders on
+      navigation — now `useLocation()`. And brand logos use a plain `<img>` rather than
+      `ImageWithFallback`, whose `fallback` is a required placeholder image; a logo's fallback
+      is the initials block beside it.
+
 - [ ] **S13. Pagination / load-more**, replacing the fixed `pageSize: 100` fetch, with
       server-side `where` filters wherever the Data Gateway can express them.
 - [ ] **S14. SEO metadata** — title/description/canonical/OG/JSON-LD. None exists anywhere.

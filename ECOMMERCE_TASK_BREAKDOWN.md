@@ -345,8 +345,9 @@ plan, role model, shared inventory module. Status against what's actually there:
       placement on *every* path — that check was split out from the reserve-and-hold flow so
       it no longer waits on the schema imports, since reading `WarehouseInventory` works
       today. Only the hold itself is flag-gated.
-- [ ] Brand schema has generated metadata but zero call sites — no brand pages exist despite
-      the schema being ready.
+- [x] **Brand pages — built** (sequence step S12). `/brands` (grid, inactive hidden, no-status
+      treated as visible), `/brand/:slug` (header plus that brand's products), a `?brand=`
+      filter on the listing page, a brand link on the product detail page, and a nav entry.
 - [ ] No pagination/infinite scroll (fixed `pageSize: 100`), no search suggestions, no SEO
       metadata anywhere.
 - [ ] No delivery/pickup ETA logic (static copy only).
