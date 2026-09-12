@@ -457,10 +457,14 @@ plan, role model, shared inventory module. Status against what's actually there:
       sharing one `LifecycleActionDeps` type), and adding a fourth is a two-line registry
       entry plus a new module, not another `if`.
 - [ ] `WarehouseZones`/`Bins` as real entities (currently only an embedded `BinLocation` DTO).
-- [ ] Low-stock/out-of-stock detection — explicitly and correctly omitted from the current
-      dashboard (`DashboardPage.tsx:51-54` states why: no aggregation capability yet); needs
-      either a precomputed summary schema or per-record client-side checking once
-      `AvailableToSell` is reliably maintained (§1.1 again).
+- [x] **Low-stock/out-of-stock detection — built** (sequence step S17). `lib/blocks/low-stock.ts`
+      plus a "Needs attention" panel on the dashboard and per warehouse. The dashboard's old
+      note blamed missing aggregation; the real blocker is narrower and permanent — comparing
+      `AvailableToSell` against that row's own `ReorderPoint` is a two-field comparison no
+      `where` clause can express. Computed over a bounded page, and the panel says how many
+      rows it actually checked rather than implying it saw everything. An unset `ReorderPoint`
+      (0) is treated as unset, not as a threshold. Most trustworthy once §1.1 lands and
+      `AvailableToSell` is maintained by the CAS module rather than typed in.
 - [ ] Inventory dashboards beyond raw counts — valuation, ageing, accuracy: none exist; same
       aggregation gap.
 - [x] **Immutability enforcement for `InventoryMovement` in the UI, not just policy — fixed.**

@@ -244,7 +244,7 @@ and waiting. Everything else in Track U is drafted as its step comes up.
       guarded on the choice still being unset, so a profile refresh can't undo a deliberate
       pick. "Save this address" is offered only for an address that isn't already on file.
 
-### Wave D — Catalog and storefront depth (no dependencies)
+### Wave D — Catalog and storefront depth (no dependencies) ✅ complete
 
 - [x] **S12. Brand pages.** `/brands` and `/brand/:slug`, a `?brand=` filter on the listing
       page, a brand link on every product detail page, and a nav entry. The `Brand` schema has
@@ -344,9 +344,31 @@ and waiting. Everything else in Track U is drafted as its step comes up.
       have submitted *the product*, with no error anywhere. `ResourceForm` gained a `nested`
       mode that renders a container instead and wires submit to the button directly.
 
-- [ ] **S17. Low-stock / out-of-stock surfacing in the backoffice** — bounded client-side per
-      warehouse, since the Data Gateway still can't aggregate. *Runtime-blocked on U1*, which
-      is what makes `AvailableToSell` trustworthy.
+- [x] **S17. Low-stock / out-of-stock surfacing in the backoffice.** `lib/blocks/low-stock.ts`
+      + a "Needs attention" panel on the dashboard and on each warehouse's own page: what's out
+      of stock, what's below its reorder point, worst first.
+
+      The dashboard carried a standing note that these numbers needed server-side aggregation
+      and so weren't shown. **Half right, and the half that was wrong is the interesting part:**
+      aggregation is genuinely missing, but the blocker for *this* question is narrower and
+      permanent — "is `AvailableToSell` below **this row's own** `ReorderPoint`" compares two
+      fields of one document, which a `where` clause can't express at any scale, aggregation or
+      not. Counting a bounded page client-side answers it.
+
+      So the panel **states its own bound**: when there are more rows than it examined it says
+      how many of how many, because a count that silently covered a third of the warehouse
+      would be exactly the guessing the dashboard was right to refuse. A partial count that
+      admits it is useful; one that doesn't is worse than none.
+
+      One rule worth naming: **an unset `ReorderPoint` is not a threshold.** It defaults to 0,
+      and reading that as "reorder at zero" would mark healthy stock as borderline across the
+      whole catalog.
+
+      *More trustworthy after U1*, which is what makes `AvailableToSell` maintained rather than
+      hand-entered. Verified: 22 assertions.
+
+      Also renamed both apps' harnesses to `npm run verify` — `verify:orders` and
+      `verify:inventory` had both outgrown their names.
 
 ### Wave E — New schema families (draft → you import → build)
 
