@@ -178,7 +178,7 @@ and waiting. Everything else in Track U is drafted as its step comes up.
       row does not (a variant id sitting in a column labelled `Sku` is a lie an auditor has no
       way to spot, and the row already carries `VariantId`).
 
-### Wave C — Commerce completion (written now, live on U2)
+### Wave C — Commerce completion (written now, live on U2) ✅ complete
 
 - [x] **S9. Backoffice Orders admin.** `lib/blocks/orders.ts` + `pages/OrdersPage.tsx` +
       a nav entry and route. List with status/payment/order-number filters and paging, a
@@ -232,8 +232,17 @@ and waiting. Everything else in Track U is drafted as its step comes up.
       *Runtime-blocked on U2.* Each page explains what it's waiting for until then, rather
       than 404ing or showing an empty list that reads as a bug.
 
-- [ ] **S11. Saved-address picker at checkout** (today: prefill from the last saved address
-      only).
+- [x] **S11. Saved-address picker at checkout.** Replaces "prefill from the last one saved":
+      the profile's addresses are listed as choices, plus "Use a different address", defaulting
+      once to the most recent.
+
+      Two details that make it behave rather than just render: **the picker fills the same form
+      fields a typed address would**, so validation, order placement and the save path stay one
+      code path instead of two that can drift; and **the fields stay editable** — tweaking a
+      saved address for one delivery switches the choice to "new" so the edit isn't silently
+      stamped back over by the effect that mirrors the selection. The default is applied once,
+      guarded on the choice still being unset, so a profile refresh can't undo a deliberate
+      pick. "Save this address" is offered only for an address that isn't already on file.
 
 ### Wave D — Catalog and storefront depth (no dependencies)
 

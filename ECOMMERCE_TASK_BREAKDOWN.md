@@ -223,9 +223,11 @@ plan, role model, shared inventory module. Status against what's actually there:
       appends to `CommerceCustomer.Addresses` on successful order placement. See
       `commerce-customer-provider.tsx` + `commerce.ts`'s `ensureCommerceCustomer`/
       `addCustomerAddress`. Inert until the draft schema is imported.
-- [ ] No full saved-address *picker* yet (multiple addresses just prefill from the last one
-      saved) — fine for a first pass, a real selector is a small follow-up once there's more
-      than one address to choose from.
+- [x] **Saved-address picker — built** (sequence step S11). The profile's addresses are listed
+      as choices at checkout with a "Use a different address" option, defaulting once to the
+      most recently saved. The picker fills the same form fields a typed address would, so
+      validation and placement stay one code path; the fields remain editable, and editing one
+      switches the choice to "new" so the edit isn't stamped back over.
 
 ### Data Gateway
 - [x] **Drafted** — `CommerceCustomer`, `Cart`, `Order` entities + `CartItem`/`OrderItem` DTOs
@@ -351,7 +353,6 @@ plan, role model, shared inventory module. Status against what's actually there:
 - [ ] No reviews/ratings — no schema, no UI.
 - [ ] No recommended/recently-viewed tracking.
 - [ ] No real tax calculation (flat `DELIVERY_CHARGE = 120` constant) or shipping-rate logic.
-- [ ] No saved-address selection (raw text inputs at checkout).
 - [x] **Customer account area — built** (sequence step S10). `/account/orders`,
       `/account/orders/:orderId`, `/account/addresses`, `/account/profile`, behind a
       `RequireAuth` gate that prompts rather than bouncing to SSO. Order history derives one
