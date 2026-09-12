@@ -69,11 +69,34 @@ and waiting. Everything else in Track U is drafted as its step comes up.
 
 ### Wave B — The oversell-prevention core (the actual point of the inventory model)
 
-- [ ] **S4. Shared compare-and-swap inventory-ops module.** `reserve` / `commit` / `release`,
-      each one guarded `updateWarehouseInventory` (`Version` + `AvailableToSell: {gte: qty}`),
-      `totalImpactedData` checked, bounded retry on contention, paired with an idempotent
-      `InventoryMovement` ledger insert. `ECOMMERCE_PLATFORM_ON_BLOCKS.md` §5.1. Everything
-      else inventory-shaped is UI around this. *Runtime-blocked on U1.*
+- [x] **S4. Shared compare-and-swap inventory-ops module.** `src/lib/blocks/inventory-ops.ts`,
+      mirrored byte-for-byte in both apps (this workspace has no shared package —
+      `collections.ts` and `schema-meta.ts` are duplicated the same way). `reserveStock` /
+      `releaseStock` / `commitStock`, each line a read → compute → guarded
+      `updateWarehouseInventory(where:{ItemId, Version, AvailableToSell:{gte}}) ` → check
+      `totalImpactedData`, with bounded jittered retry on contention, an idempotent
+      `InventoryMovement` ledger row per applied line, and compensation across lines (a
+      multi-line reserve rolls back its successful lines when a later one fails, since the
+      gateway has no cross-document transaction).
+
+      Design points worth knowing: **`AvailableToSell` is recomputed from the buckets on every
+      write, never adjusted**, so drift above what the buckets support is caught locally rather
+      than sailing through the gateway's own `gte` guard and overselling. A **missing or
+      unreadable `Version` is fatal** — the module refuses the write rather than falling back
+      to an unguarded one (the §1.5 `Long` problem). Balance is written **before** the ledger
+      row, and a failed ledger write is reported (`ledgerWriteFailed`) rather than triggering a
+      rollback that could itself fail. Behind `VITE_INVENTORY_WRITES_LIVE`, off by default,
+      because `WarehouseInventory` writes are denied for everyone until U1 is imported.
+
+      **Verified:** `npm run verify:inventory` in `ecommerce-consumer` — 65 assertions across
+      19 scenarios (happy path, insufficient stock, contention retry and exhaustion, a real
+      concurrent writer taking the stock mid-flight, multi-line rollback, drift detection and
+      self-repair, unreadable `Version`, denied writes, release clamping, commit semantics,
+      ledger failure, per-line idempotency keys, pre-batch-2 schema fallback, `Blocked` stock).
+      The harness SSR-loads the real module through Vite with only its two gateway imports
+      stubbed, so it can't drift from what ships — confirmed by injecting a regression and
+      watching it fail.
+
 - [ ] **S5. Wire reserve → place order → commit into storefront checkout**, with release on
       failure and on abandonment. *Runtime-blocked on U1 + U2.*
 - [ ] **S6. Lazy reservation-expiry sweep.** No scheduler exists (§6.3), so expiry is

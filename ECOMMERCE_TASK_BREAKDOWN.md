@@ -356,9 +356,21 @@ plan, role model, shared inventory module. Status against what's actually there:
       `rowWarning` prop) — with no scheduler in this project
       (`ECOMMERCE_PLATFORM_ON_BLOCKS.md` §6.3), something still has to notice before
       "Mark expired" is useful, and this is that noticing.
-- [ ] The compare-and-swap reserve/commit/release helper module
-      (`ECOMMERCE_PLATFORM_ON_BLOCKS.md` §5.1) — not started; blocked on §1.1 being fixed
-      first.
+- [x] **The compare-and-swap reserve/commit/release helper module — built.**
+      `src/lib/blocks/inventory-ops.ts` in both apps (mirrored, like `collections.ts`),
+      implementing `ECOMMERCE_PLATFORM_ON_BLOCKS.md` §5.1: guarded `updateWarehouseInventory`
+      on `{ItemId, Version, AvailableToSell:{gte:qty}}`, `totalImpactedData` checked, bounded
+      jittered retry, an idempotent `InventoryMovement` per applied line, and cross-line
+      compensation standing in for the transaction the gateway doesn't have. Three things it
+      does that the spec didn't call for and that turned out to matter: `AvailableToSell` is
+      recomputed from the buckets rather than adjusted (so stored drift can't slip past the
+      gateway's own guard and oversell), an unreadable `Version` is fatal rather than
+      degrading to an unguarded write (§1.5), and the balance is written before the ledger so
+      a failed ledger row is an auditing gap rather than a phantom movement. Gated behind
+      `VITE_INVENTORY_WRITES_LIVE`, **off until §1.1 is imported** — writes are denied for
+      everyone today. Verified by `npm run verify:inventory` (65 assertions, 19 scenarios,
+      against a simulated gateway that enforces the CAS filter the way one Mongo `UpdateOne`
+      would).
 - [ ] Allocation strategy logic — not started (no code references allocation of any kind).
 - [x] **`StockTransfer` approval/dispatch/receive workflow — fixed**, matching the pattern
       just built for reservations. `stock-transfer-actions.ts`'s `stockTransferActions()` adds
@@ -421,8 +433,9 @@ plan, role model, shared inventory module. Status against what's actually there:
       (`src/components/storefront/payment-partners-bar.tsx`) are static/decorative, wired to
       nothing. Per `ECOMMERCE_PLATFORM_ON_BLOCKS.md` §6.1/§6.3, this needs a PSP hosted
       checkout plus a manual staff-side confirmation screen in the backoffice — neither exists.
-- [ ] Reservation expiry (lazy/client-triggered per §6.3) — not started; depends on
-      reservations working at all first (§1.1, §4).
+- [ ] Reservation expiry (lazy/client-triggered per §6.3) — not started. The balance half is
+      ready now (`releaseStock` in `inventory-ops.ts`); what's missing is the sweep that finds
+      expired reservations and calls it. Sequence step S6.
 
 ---
 
