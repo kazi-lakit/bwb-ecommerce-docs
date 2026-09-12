@@ -378,7 +378,28 @@ Each of these is one `.json` + `.md` draft pair, then the feature on top.
 - [ ] **S19. `Review` / `Rating`** — schema and UI, both absent.
 - [ ] **S20. `Favourite`** — makes the wishlist server-backed (last localStorage-only provider).
 - [ ] **S21. `TaxRate` / `ShippingRate`** — replaces the flat `DELIVERY_CHARGE = 120` constant.
-- [ ] **S22. Bulk import/export** in the backoffice (CSV).
+- [x] **S22. Bulk import/export.** `lib/csv.ts` (an RFC 4180 codec), `lib/blocks/bulk.ts`
+      (row ↔ payload) and an Import / export drawer on every entity list. Export honours the
+      list's current filters; composite fields travel as JSON in one cell; `ItemId` is the
+      first column, which is what makes a re-import an **update rather than a duplicated
+      catalog** — an export you can't safely re-import is a report, not a bulk edit tool.
+
+      Three decisions carry the design. **An empty cell is skipped, never sent as empty**: a
+      sheet edited in one column and saved back is full of blanks nobody meant, and reading
+      those as "clear this field" destroys data silently. Clearing deliberately therefore isn't
+      expressible — the right side of the trade, since that's the reading you can't undo.
+      **Rows with problems are skipped, not blocking**: a thousand-row sheet with three bad
+      cells should import 997 and name the three. **Failures are reported per line**, because
+      with no batch mutation and no transaction the rows before a failure are already written,
+      and "import failed" tells you nothing actionable.
+
+      The CSV codec was written rather than pulled in — it's one encoder and one parser, and
+      the failure modes that matter are the ones `split(",")` gets wrong. Parsed
+      character-by-character, since a quoted field can contain the line separator: splitting on
+      newlines first corrupts exactly the data most likely to be quoted.
+
+      Verified: 60 assertions — embedded commas/quotes/newlines, Excel BOMs, CRLF vs LF, type
+      coercion, required-on-create-but-not-update, unknown columns, and the empty-cell rule.
 
 ### Wave F — Procurement, fulfillment, payments
 

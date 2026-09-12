@@ -289,7 +289,12 @@ plan, role model, shared inventory module. Status against what's actually there:
       machinery, so no `schema-meta.ts` regeneration is needed before the schema is live.
       Gated on `VITE_COMMERCE_SCHEMAS_LIVE`; the screen shows what it's waiting for until then.
       Covered by `npm run verify:orders` (41 assertions).
-- [ ] No bulk import/export.
+- [x] **Bulk import/export — built** (sequence step S22). An Import / export drawer on every
+      entity list, backed by an RFC 4180 codec (`lib/csv.ts`) and a row↔payload mapper
+      (`lib/blocks/bulk.ts`). Export honours current filters and round-trips: `ItemId` makes a
+      re-import an update, not a duplicate. Empty cells are skipped rather than clearing
+      fields, bad rows are skipped rather than blocking the file, and failures are reported per
+      line since there's no transaction. 60 assertions.
 - [x] Permission-gated UI — see Phase 0 above. Currently scoped to Edit/Delete actions on
       the entity tables; nav-level/route-level gating and finer-grained per-resource
       permissions (beyond the built-in `admin` role) are still open.
