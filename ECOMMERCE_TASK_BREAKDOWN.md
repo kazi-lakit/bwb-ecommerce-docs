@@ -352,8 +352,14 @@ plan, role model, shared inventory module. Status against what's actually there:
 - [ ] No recommended/recently-viewed tracking.
 - [ ] No real tax calculation (flat `DELIVERY_CHARGE = 120` constant) or shipping-rate logic.
 - [ ] No saved-address selection (raw text inputs at checkout).
-- [ ] No customer account area at all — no `/account`, `/orders`, `/profile`, `/addresses`
-      routes exist in `App.tsx`; nothing beyond the login gate on `/checkout`.
+- [x] **Customer account area — built** (sequence step S10). `/account/orders`,
+      `/account/orders/:orderId`, `/account/addresses`, `/account/profile`, behind a
+      `RequireAuth` gate that prompts rather than bouncing to SSO. Order history derives one
+      plain-English status from the three status fields; order detail shows the line snapshots
+      as placed; addresses can be added and removed (`setCustomerAddresses` rewrites the whole
+      embedded array, so last writer wins — fine for a personal address book); profile is
+      read-only because those fields belong to IAM. Reads real data once
+      `VITE_COMMERCE_SCHEMAS_LIVE` is on; explains what it's waiting for until then.
 - [x] `src/components/providers/auth-provider.tsx:20-24` carried a **stale comment** copied
       from a sibling app, claiming this app gates "every product/inventory screen" behind
       auth — it doesn't (confirmed no `ProtectedLayout` exists here). **Fixed** — comment now

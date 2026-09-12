@@ -209,8 +209,29 @@ and waiting. Everything else in Track U is drafted as its step comes up.
       un-shipped, and shipping twice not consuming stock twice. Removing the order-match
       condition makes two of them fail, checked rather than assumed.
 
-- [ ] **S10. Storefront customer account area.** `/account`, `/orders`, `/orders/:id`,
-      `/addresses`, `/profile` — none of these routes exist today.
+- [x] **S10. Storefront customer account area.** `/account/orders`, `/account/orders/:orderId`,
+      `/account/addresses`, `/account/profile`, plus `lib/blocks/account.ts` and a
+      `RequireAuth` gate. None of these routes existed. The customer-facing other side of S9:
+      order history with a single plain-English status line derived from the three separate
+      status fields, order detail with the line snapshots and totals as placed, an address
+      book with add and remove, and a read-only profile.
+
+      Three deliberate calls: **`RequireAuth` shows a sign-in prompt rather than bouncing
+      straight to SSO** (this is a public storefront — someone arriving from a bookmark should
+      be told where they are), it is a convenience and not the security boundary (`Order`'s
+      row-level policy is); **every account query filters on `CustomerId` anyway**, so a client
+      that forgets to scope gets an empty list rather than silently depending on the server to
+      save it; and **profile is read-only**, because deciding which IAM identity fields a
+      customer may change about themselves isn't a call to make as a side effect of building
+      an account page.
+
+      Also needed `setCustomerAddresses` — `Addresses` is an embedded array, so removing one
+      means rewriting the whole list, which makes last-writer-wins the real concurrency
+      behaviour. Fine for a personal address book, noted where it matters.
+
+      *Runtime-blocked on U2.* Each page explains what it's waiting for until then, rather
+      than 404ing or showing an empty list that reads as a bug.
+
 - [ ] **S11. Saved-address picker at checkout** (today: prefill from the last saved address
       only).
 
