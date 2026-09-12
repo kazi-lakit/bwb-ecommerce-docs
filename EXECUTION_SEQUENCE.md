@@ -67,7 +67,7 @@ and waiting. Everything else in Track U is drafted as its step comes up.
       schema half is in batch 2 and needs your `blocks data schema pull` to confirm which way
       it actually is live. **S4 depends on the answer.**
 
-### Wave B — The oversell-prevention core (the actual point of the inventory model)
+### Wave B — The oversell-prevention core (the actual point of the inventory model) ✅ complete
 
 - [x] **S4. Shared compare-and-swap inventory-ops module.** `src/lib/blocks/inventory-ops.ts`,
       mirrored byte-for-byte in both apps (this workspace has no shared package —
@@ -146,9 +146,25 @@ and waiting. Everything else in Track U is drafted as its step comes up.
       sweepers racing. Removing the `Status` filter from the claim makes that scenario fail
       with 2 units eaten from a neighbouring reservation — checked, not assumed.
 
-- [ ] **S7. Cart and checkout stock revalidation.** The storefront checks availability on the
-      PDP and listing today, but not when a quantity is raised in the cart, and not at the
-      moment of placement. Closes the honest gap noted in the breakdown's §3.
+- [x] **S7. Cart and checkout stock revalidation.** A cart line records a price and a
+      quantity, not a stock position — six in the cart stays six long after someone else buys
+      the last four. `useCartStock` re-reads availability for every line: the quantity stepper
+      caps at what's left, a line over its limit says so, a line with five or fewer warns, and
+      Checkout is disabled while any line is short.
+
+      **The bigger half: the checkout availability check now runs on every path, unflagged.**
+      It was only reachable inside the reserve-and-hold flow, which needs both U1 and U2 — so
+      until then, checkout had no stock check at all, which is exactly the state the app is in
+      today. Reading `WarehouseInventory` works right now (live schema, publicly readable), so
+      the check was split from the hold: the check always runs, only the write waits on the
+      imports. Holding stock against the simulated order would strand it until expiry, so the
+      hold is passed explicitly as `{ hold: COMMERCE_SCHEMAS_LIVE }` rather than inferred.
+
+      Also deliberate: with holds off, a failed stock read is advisory and must not stop a
+      sale; with holds on it's load-bearing, because stock that can't be read can't be held.
+      Verified: 6 further assertions, and the cart/checkout messages confirmed present in the
+      default flags-off bundle — the point of the change.
+
 - [ ] **S8. Carry a real SKU on cart lines.** Removes the `OrderItem.Sku` →
       `variantId`/`productId` fallback that `commerce.ts` currently documents against itself.
 

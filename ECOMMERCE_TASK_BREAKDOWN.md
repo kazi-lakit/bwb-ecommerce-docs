@@ -329,7 +329,12 @@ plan, role model, shared inventory module. Status against what's actually there:
       checkout allocates cart lines to warehouses and holds the stock via `inventory-ops.ts`
       before placing the order, releasing it if placement fails (`checkout-inventory.ts`,
       sequence step S5). Gated behind `VITE_INVENTORY_WRITES_LIVE` until §1.1 is imported.
-      Still open below: re-checking stock when a quantity is raised in the cart (S7).
+      **And the two gaps this entry used to list are closed (S7):** the cart re-reads
+      availability per line (`useCartStock`) so the stepper caps at what's left, short lines
+      say so, and Checkout is disabled while any line is over; and checkout revalidates at
+      placement on *every* path — that check was split out from the reserve-and-hold flow so
+      it no longer waits on the schema imports, since reading `WarehouseInventory` works
+      today. Only the hold itself is flag-gated.
 - [ ] Brand schema has generated metadata but zero call sites — no brand pages exist despite
       the schema being ready.
 - [ ] No pagination/infinite scroll (fixed `pageSize: 100`), no search suggestions, no SEO
