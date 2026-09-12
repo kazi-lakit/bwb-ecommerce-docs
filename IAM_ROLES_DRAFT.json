@@ -1,0 +1,180 @@
+{
+  "permissionNamingConvention": "service::resource::action \u2014 matching the platform's own style (blocks-data::schema::create-schema-index) and the placeholder already used in P0_POLICY_FIXES.json (inventory::balance::write).",
+  "howThisIsConsumed": {
+    "dataGateway": "Row-level policies compare AUTH 'roles' (LeftOperand 'roles', Operator CONTAIN=6) or 'permissions' against a StaticValue. Every placeholder policy in P0_POLICY_FIXES.json and COMMERCE_SCHEMAS_DRAFT.json is currently scoped to the built-in 'admin' role and is meant to be renarrowed to the roles below once they exist.",
+    "apps": "ecommerce-back-office/src/lib/blocks/access.ts already exposes useHasRole()/useHasPermission() reading the IAM token's roles/permissions arrays. It is wired to Edit/Delete gating today via list-config.ts and will consult these role names unchanged once they are issued."
+  },
+  "status": "DRAFT \u2014 not created. Run `blocks iam roles list` first: some of these may already exist, and this file was written without CLI access to check.",
+  "roles": [
+    {
+      "displayName": "Administrator",
+      "roleName": "admin",
+      "description": "Full access. Already exists as the platform built-in and is what every placeholder policy currently names.",
+      "grants": [
+        "*"
+      ],
+      "notes": "Do not create \u2014 this is the built-in. Listed so the mapping below is complete."
+    },
+    {
+      "displayName": "Catalog manager",
+      "roleName": "catalog-manager",
+      "description": "Creates and maintains products, variants, categories, brands and media.",
+      "grants": [
+        "catalog::product::write",
+        "catalog::product::edit",
+        "catalog::product::delete",
+        "catalog::variant::write",
+        "catalog::variant::edit",
+        "catalog::variant::delete",
+        "catalog::category::write",
+        "catalog::category::edit",
+        "catalog::brand::write",
+        "catalog::brand::edit",
+        "storage::media::upload"
+      ],
+      "notes": "storage::media::upload backs the product image upload already shipped in image-upload-field.tsx."
+    },
+    {
+      "displayName": "Order manager",
+      "roleName": "order-manager",
+      "description": "Works the order queue: status transitions, cancellations, customer lookups.",
+      "grants": [
+        "commerce::order::read-all",
+        "commerce::order::edit",
+        "commerce::customer::read-all"
+      ],
+      "notes": "Replaces the 'admin' placeholder in COMMERCE_SCHEMAS_DRAFT.json's 'staff can read all orders' and 'staff can edit orders' policies. Needed before sequence step S9."
+    },
+    {
+      "displayName": "Warehouse manager",
+      "roleName": "warehouse-manager",
+      "description": "Owns a warehouse: approves and dispatches transfers, adjusts balances, oversees operators.",
+      "grants": [
+        "inventory::balance::write",
+        "inventory::balance::edit",
+        "inventory::movement::write",
+        "inventory::transfer::approve",
+        "inventory::transfer::edit",
+        "inventory::reservation::edit",
+        "warehouse::warehouse::edit"
+      ],
+      "notes": "inventory::transfer::approve is the app-level gate stock-transfer-actions.ts currently checks as the 'admin' role."
+    },
+    {
+      "displayName": "Inventory operator",
+      "roleName": "inventory-operator",
+      "description": "Day-to-day stock work: counts, adjustments, picking. No approvals.",
+      "grants": [
+        "inventory::balance::write",
+        "inventory::balance::edit",
+        "inventory::movement::write",
+        "inventory::reservation::edit"
+      ],
+      "notes": "This is the role P0_POLICY_FIXES.json's two WarehouseInventory policies are named after and should be renarrowed to. Deliberately has no ::approve permission."
+    },
+    {
+      "displayName": "Procurement manager",
+      "roleName": "procurement-manager",
+      "description": "Suppliers, purchase orders, goods receipt.",
+      "grants": [
+        "procurement::supplier::write",
+        "procurement::supplier::edit",
+        "procurement::purchase-order::write",
+        "procurement::purchase-order::edit",
+        "procurement::purchase-order::approve",
+        "procurement::purchase-order::close",
+        "procurement::goods-receipt::write"
+      ],
+      "notes": "::approve and ::close are the two steps purchase-order-actions.ts gates on 'admin' today. ::goods-receipt::write anticipates sequence step S23."
+    },
+    {
+      "displayName": "Finance user",
+      "roleName": "finance-user",
+      "description": "Reads cost and financial data; confirms payments. No catalog or stock authority.",
+      "grants": [
+        "procurement::supplier::read-cost",
+        "procurement::purchase-order::read",
+        "commerce::order::read-all",
+        "commerce::payment::confirm",
+        "inventory::valuation::read"
+      ],
+      "notes": "commerce::payment::confirm is the manual payment-confirmation action that replaces a PSP webhook (sequence step S26). read-cost pairs with the field-level follow-up in P0_POLICY_FIXES.md."
+    },
+    {
+      "displayName": "Customer-support user",
+      "roleName": "support-user",
+      "description": "Reads orders and customer profiles to answer questions. Cannot change stock or prices.",
+      "grants": [
+        "commerce::order::read-all",
+        "commerce::customer::read-all",
+        "commerce::order::edit-notes"
+      ],
+      "notes": "Deliberately narrower than Order manager: no status transitions."
+    },
+    {
+      "displayName": "Auditor",
+      "roleName": "auditor",
+      "description": "Read-only across everything, including the immutable movement ledger.",
+      "grants": [
+        "inventory::movement::read",
+        "inventory::balance::read",
+        "commerce::order::read-all",
+        "procurement::purchase-order::read",
+        "inventory::valuation::read"
+      ],
+      "notes": "Read-only by construction \u2014 grant no ::write/::edit/::delete to this role. Pairs with making InventoryMovement read non-Public (task breakdown \u00a71.3)."
+    }
+  ],
+  "schemaPolicyRenarrowing": {
+    "WarehouseInventory": {
+      "WRITE/EDIT": [
+        "inventory-operator",
+        "warehouse-manager"
+      ],
+      "currentlyScopedTo": "admin (placeholder, P0_POLICY_FIXES.json)"
+    },
+    "InventoryMovement": {
+      "WRITE": [
+        "inventory-operator",
+        "warehouse-manager"
+      ],
+      "READ": [
+        "auditor",
+        "warehouse-manager",
+        "finance-user"
+      ],
+      "DELETE": "none \u2014 default-deny stays"
+    },
+    "InventoryReservation": {
+      "EDIT": [
+        "inventory-operator",
+        "warehouse-manager"
+      ]
+    },
+    "Supplier/PurchaseOrder": {
+      "READ/EDIT": [
+        "procurement-manager",
+        "finance-user",
+        "auditor"
+      ]
+    },
+    "Order": {
+      "READ-all": [
+        "order-manager",
+        "support-user",
+        "finance-user",
+        "auditor"
+      ],
+      "EDIT": [
+        "order-manager"
+      ],
+      "DELETE": "none \u2014 default-deny stays"
+    },
+    "CommerceCustomer": {
+      "READ-all": [
+        "order-manager",
+        "support-user"
+      ]
+    }
+  }
+}

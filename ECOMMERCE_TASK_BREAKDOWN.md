@@ -114,6 +114,32 @@ reservation record directly against the Data Gateway, bypassing cart/checkout lo
 - [ ] Change to `Custom`, scoped to an authenticated checkout flow or a service permission —
       not open write.
 
+### 1.5 `WarehouseInventory.Version` is typed `Long`, which the Data Gateway does not support
+
+Found while drafting the index plan (sequence step S3). The gateway's scalar list is `String`,
+`Int`, `Float`, `Boolean`, `DateTime`, `ID`
+(`blocks-data/server/DataGateway.DomainService/Helpers/GraphQlTypeHelper.cs:12`), and its
+bulk-import validator names `Long` explicitly as a type it must reject "rather than being
+persisted and only failing later when the GraphQL schema is built"
+(`Validators/SchemaImportValidator.cs:32`).
+
+This is the optimistic-concurrency guard the entire compare-and-swap design depends on
+(`ECOMMERCE_PLATFORM_ON_BLOCKS.md` §5.1). If it isn't a usable scalar, there is no safe
+reserve/commit/release — which is the mechanism that prevents overselling.
+
+- [x] **Client half fixed.** Both apps' `collections.ts` emitted `Version { }` for it — an
+      empty sub-selection is a GraphQL *parse error* that fails the whole query, so every
+      `WarehouseInventory` read through the generic collection layer was broken: the
+      backoffice inventory screens and the storefront's `useVariantAvailability` alike. Fields
+      whose type has no `COMPLEX_TYPES` entry are now selected bare. `ID` was also added to
+      the generator's scalar list, where it always belonged.
+- [ ] **Confirm what's actually live** — `blocks data schema pull --json`, check the real type.
+      Either the project has an invalid field, or this repo's export is stale. Both are worth
+      knowing; only the first needs a push.
+- [ ] **Retype to `Int` if needed** — drafted in `SCHEMA_BATCH_2.json`. The gateway maps C#
+      `long` to `Int` anyway (`GraphQlTypeHelper.GetScalarType`), so `Int` is the correct
+      spelling for this counter.
+
 ---
 
 ## 2. Phase 0 — Foundation
@@ -145,14 +171,22 @@ plan, role model, shared inventory module. Status against what's actually there:
 - [x] **`WarehouseInventory` already has a `Version` field** and `InventoryMovement` already
       has an `IdempotencyKey` field — both schemas were designed with the compare-and-swap
       pattern (§5.1) in mind, which is good news for Phase 1/2 work, once §1.1 is fixed.
-- [ ] **Quantity buckets are incomplete.** `WarehouseInventory.Quantity` has `OnHand`,
-      `Reserved`, `Damaged`, `QualityHold`, `Incoming` — missing `Blocked` and `Backordered`
-      from the plan's nine buckets (§8.2); `InTransit` isn't tracked as a balance bucket either
-      (only implicitly via `StockTransfer.Items` quantities).
-- [ ] **Index plan not started** — no unique index exists yet on `InventoryMovement.IdempotencyKey`
-      (the field exists; the actual MongoDB unique index does not, per
-      `DATA_GATEWAY_STORAGE_FEATURES_AND_SECURITY.md` B2). Needed before any idempotent
-      write path can be trusted.
+- [ ] **Quantity buckets are incomplete — drafted, not applied.** `WarehouseInventory.Quantity`
+      has `OnHand`, `Reserved`, `Damaged`, `QualityHold`, `Incoming`; `Blocked`, `Backordered`
+      and `InTransit` from the plan's nine (§8.2) are added in `SCHEMA_BATCH_2.json`. `Blocked`
+      is the one that changes behaviour rather than reporting: it belongs in
+      `AvailableToSell = OnHand − Reserved − Damaged − QualityHold − Blocked`, so without it
+      administratively held stock can still be sold.
+- [ ] **Index plan drafted, not applied.** `INDEX_PLAN.json` — 24 indexes in three tiers,
+      verified against the platform's own `SchemaIndexService`/`CreateSchemaIndexRequest`
+      rather than documentation. Tier 1 is correctness, not speed: besides
+      `InventoryMovement.IdempotencyKey`, it includes a **unique
+      `WarehouseInventory(WarehouseId, VariantId)`** — nothing enforces that natural key today,
+      and a duplicate balance row would make `AvailableToSell` sum wrong *and* make every
+      compare-and-swap update whichever row Mongo returned first: a silent oversell. Two
+      hazards documented: unique indexes can't be sparse (so every unique field needs a
+      backfill first, and `ProductVariant.Barcode` shouldn't get one at all), and embedded
+      sub-fields can never be indexed. Applying these is yours — see `SCHEMA_BATCH_2.md`.
 - [x] **Feature-gating mechanism wired** (`ecommerce-back-office/src/lib/blocks/access.ts`,
       `useHasRole`/`useHasPermission`) — the IAM `roles`/`permissions` arrays were being
       fetched but never consulted anywhere. Applied to the Edit/Delete actions across all
@@ -169,7 +203,10 @@ plan, role model, shared inventory module. Status against what's actually there:
       just the built-in `admin`). Creating `blocks iam roles create` entries for Order
       manager/Warehouse manager/Inventory operator/etc. is IAM-CLI work, left to you per this
       project's CLI-stays-user-owned convention (unverified whether any already exist —
-      check `blocks iam roles list` directly).
+      check `blocks iam roles list` directly). **Drafted** in `IAM_ROLES_DRAFT.json`: all nine
+      with `service::resource::action` permissions, plus a per-schema map saying which role
+      replaces `admin` in each placeholder policy already written, so renarrowing is
+      mechanical.
 - [ ] **Shared inventory CAS module not started.** No client-side code in either app currently
       performs a guarded reserve/commit/release write — because it can't (§1.1) and because
       nothing calls `WarehouseInventory`/`InventoryMovement` for a business operation yet,
@@ -202,14 +239,15 @@ plan, role model, shared inventory module. Status against what's actually there:
 - [ ] Add a real MongoDB unique index on `Order.IdempotencyKey` (the field exists in the
       draft; the index doesn't — `IsUniqueData` alone isn't a constraint).
 - [ ] Fix §1 policy issues on the 11 existing entities (separate from the above).
-- [ ] **Small tooling bug found while consolidating docs into `bwb-ecommerce-docs/`:**
-      `scripts/gen-schema-meta.mjs` (both apps) doesn't actually emit `isComplexFieldType`/
-      `PRIMITIVE_FIELD_TYPES` — that helper is hand-maintained directly in the committed
-      "AUTO-GENERATED — do not hand-edit" `schema-meta.ts` and depended on by
-      `collections.ts`. Running the regenerator today silently deletes it. Fix the generator
-      to emit it (or promote it to a non-generated, hand-owned file the generator doesn't
-      touch) before it costs someone a real regeneration. See
-      `bwb-ecommerce-docs/AGENTS.md`'s "Gotcha" note for the immediate workaround.
+- [x] **Small tooling bug found while consolidating docs into `bwb-ecommerce-docs/` — fixed.**
+      `scripts/gen-schema-meta.mjs` (both apps) didn't emit `isComplexFieldType`/
+      `PRIMITIVE_FIELD_TYPES` — that helper was hand-maintained directly in the committed
+      "AUTO-GENERATED — do not hand-edit" `schema-meta.ts` and imported by `collections.ts`
+      and `field-input.tsx`, so running the regenerator silently deleted it. The generator
+      now emits it (sequence step S1), and regenerating against the current schema export is
+      a byte-for-byte no-op in both apps — `node scripts/gen-schema-meta.mjs && git diff
+      --stat src/lib/blocks/schema-meta.ts` producing no output is the standing check. Fixed
+      before the Commerce import rather than after, since that import ends in a regeneration.
 
 ### Backoffice (`ecommerce-back-office`) — mostly built
 - [x] Product/Variant/Category/Brand CRUD — `src/components/resource/*`,
@@ -426,6 +464,11 @@ Phase 0).
 ---
 
 ## Related documents
+
+- `EXECUTION_SEQUENCE.md` — **the running order** for everything still unchecked here, split
+  into a Track U (`blocks` CLI imports, user-owned) and a Track C (app code), sequenced so no
+  code step waits on an import. This document stays the detailed per-task record; that one
+  decides what comes next.
 
 - `ECOMMERCE_PLATFORM_ON_BLOCKS.md` — the Blocks-native architecture this breakdown's phases
   come from, including the no-backend mitigations (manual payment confirmation, lazy

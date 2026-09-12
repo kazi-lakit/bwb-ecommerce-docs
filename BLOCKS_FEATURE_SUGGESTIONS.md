@@ -143,6 +143,49 @@ No item here is blocking — the project ships without any of them. They're rank
 
 ---
 
+### 14. [Data Gateway] Sparse / partial unique indexes
+
+`POST /schemas/indexes` builds its index with `new CreateIndexOptions { Name, Unique }` and
+nothing else (`server/DataGateway.DomainService/Repositories/DbRepository.cs:396`) — no
+`Sparse`, no `PartialFilterExpression`, no collation, no TTL.
+
+MongoDB treats a missing field as `null`, so a unique index without `sparse: true` permits
+**exactly one** document that omits the field. That makes a unique index unusable on any
+optional field. Concretely, in this project: `ProductVariant.Barcode` is declared unique and is
+genuinely optional — a unique index on it would allow one barcode-less variant in the entire
+catalog and reject the second. The same trap waits on every `IdempotencyKey` field until every
+existing row is backfilled.
+
+**Ask:** expose `IsSparse` (and ideally `PartialFilterExpression`) on `CreateSchemaIndexRequest`.
+`IsSparse` alone is a two-line change and removes the whole class of problem.
+
+Without it, "unique but optional" is simply not expressible, and every unique index needs a
+manual backfill pass first — with no way to find out except a 409 on creation.
+
+### 15. [Data Gateway] Indexable embedded and array sub-fields
+
+`IsFieldIndexable` requires `!field.IsReferenceField`
+(`server/DataGateway.DomainService/Services/Implementations/SchemaIndexService.cs:123-127`), and
+every dotted sub-field in a schema export carries `IsReferenceField: true`. So no field inside
+a composite type can ever be indexed: not `Order.Items.VariantId`, not `Cart.Items.Sku`, not
+`WarehouseInventory.Quantity.OnHand`, not `Warehouse.Address.City`.
+
+MongoDB indexes embedded and array fields natively (multikey indexes) — this is a gateway-side
+restriction, not a database one.
+
+The consequence is architectural rather than cosmetic: it means **anything you need to query or
+constrain by must be lifted to a top-level scalar**, even when that duplicates a value already
+present inside an embedded array, and nothing then keeps the two copies in agreement. A design
+that models line items as an embedded array — the natural shape, and the one this project's
+`InventoryReservation`, `Cart` and `Order` all use — has no indexable path to "which
+reservations hold this variant".
+
+**Ask:** allow dotted field paths whose leaf type is scalar, or stop setting
+`IsReferenceField: true` on sub-fields of composite types (it appears to mean "is a sub-field",
+not "is a reference", which is a separate naming problem worth untangling).
+
+---
+
 ## Summary table
 
 | # | Priority | Service | One-line ask |
@@ -160,3 +203,5 @@ No item here is blocking — the project ships without any of them. They're rank
 | 11 | P2 | Data Gateway | Aggregation primitives (`$group`/`$sum`/`$avg`) |
 | 12 | P2 | Data Gateway | Relevance-ranked full-text search + facet counts |
 | 13 | P2 | Release | Fully-managed scheduled deployment type |
+| 14 | P1 | Data Gateway | Sparse / partial unique indexes (`IsSparse` on index create) |
+| 15 | P1 | Data Gateway | Indexable embedded + array sub-fields (dotted scalar paths) |

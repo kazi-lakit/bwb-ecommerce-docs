@@ -1,0 +1,424 @@
+{
+  "endpoint": "POST /schemas/indexes",
+  "verifiedAgainst": [
+    "blocks-data/server/Api/Controllers/DataGateway/SchemaIndexController.cs:46-61",
+    "blocks-data/server/DataGateway.DomainService/Services/Implementations/SchemaIndexService.cs:34-127",
+    "blocks-data/server/DataGateway.DomainService/Models/CreateSchemaIndexRequest.cs",
+    "blocks-data/server/DataGateway.DomainService/Validators/CreateSchemaIndexRequestValidator.cs"
+  ],
+  "constraints": {
+    "entityOnly": "SchemaType must be Entity (1). DTO schemas are not indexable.",
+    "scalarOnly": "Field must exist on the schema, be a GraphQL scalar (String/Int/Float/Boolean/DateTime/ID), and have IsReferenceField=false.",
+    "noEmbeddedFields": "Every dotted sub-field (Quantity.OnHand, Items.VariantId, Address.City, ...) carries IsReferenceField=true in this project's export, so NONE of them can be indexed. See SCHEMA_BATCH_2.md.",
+    "maxFieldsPerIndex": 10,
+    "maxIndexesPerSchema": 15,
+    "indexNameIsDerived": "Name is built as <Field>_<1|-1> joined by _ and cannot be chosen; creating the same key set twice returns 409 INDEX_ALREADY_EXISTS.",
+    "noSparseOrPartial": "CreateIndexOptions sets only Name and Unique \u2014 sparse, partial, TTL and collation are not exposed."
+  },
+  "indexes": {
+    "tier1_correctness": [
+      {
+        "schemaName": "InventoryMovement",
+        "why": "The one index the CAS/ledger design actually depends on. IsUniqueData is a check-then-act query, not a constraint; without this, a retried reserve can double-write a movement.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the InventoryMovement schema definition>",
+          "Fields": [
+            {
+              "FieldName": "IdempotencyKey",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": true
+        },
+        "derivedIndexName": "IdempotencyKey_1",
+        "hazard": "Unique index with no sparse/partial option: MongoDB treats a missing field as null, so at most ONE existing document may lack this field. Backfill every record before creating this index, or creation fails with UNIQUE_INDEX_CONFLICT (409) and later inserts that omit the field fail too."
+      },
+      {
+        "schemaName": "WarehouseInventory",
+        "why": "The natural key. Two balance rows for the same variant+warehouse would make AvailableToSell sum wrong AND make every compare-and-swap update the wrong row \u2014 a silent oversell. Nothing enforces this today.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the WarehouseInventory schema definition>",
+          "Fields": [
+            {
+              "FieldName": "WarehouseId",
+              "Direction": "ASC"
+            },
+            {
+              "FieldName": "VariantId",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": true
+        },
+        "derivedIndexName": "WarehouseId_1_VariantId_1",
+        "hazard": "Deduplicate existing rows first if any warehouse/variant pair repeats."
+      },
+      {
+        "schemaName": "Order",
+        "why": "Retry-safe checkout. placeOrder() already generates and reuses a key per attempt; this is what makes it mean something.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the Order schema definition>",
+          "Fields": [
+            {
+              "FieldName": "IdempotencyKey",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": true
+        },
+        "derivedIndexName": "IdempotencyKey_1",
+        "requires": "U2 (Commerce schemas imported)",
+        "hazard": "Unique index with no sparse/partial option: MongoDB treats a missing field as null, so at most ONE existing document may lack this field. Backfill every record before creating this index, or creation fails with UNIQUE_INDEX_CONFLICT (409) and later inserts that omit the field fail too."
+      },
+      {
+        "schemaName": "Order",
+        "why": "Order numbers must not collide.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the Order schema definition>",
+          "Fields": [
+            {
+              "FieldName": "OrderNumber",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": true
+        },
+        "derivedIndexName": "OrderNumber_1",
+        "requires": "U2"
+      }
+    ],
+    "tier2_declared_unique_but_unenforced": [
+      {
+        "schemaName": "Product",
+        "why": "IsUniqueData=true on the field; no real index behind it. Slug collisions break storefront routing.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the Product schema definition>",
+          "Fields": [
+            {
+              "FieldName": "Slug",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": true
+        },
+        "derivedIndexName": "Slug_1"
+      },
+      {
+        "schemaName": "Brand",
+        "why": "Same.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the Brand schema definition>",
+          "Fields": [
+            {
+              "FieldName": "Slug",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": true
+        },
+        "derivedIndexName": "Slug_1"
+      },
+      {
+        "schemaName": "Category",
+        "why": "Same.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the Category schema definition>",
+          "Fields": [
+            {
+              "FieldName": "Slug",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": true
+        },
+        "derivedIndexName": "Slug_1"
+      },
+      {
+        "schemaName": "ProductVariant",
+        "why": "Same. SKU is the join key used by inventory, cart lines and order lines.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the ProductVariant schema definition>",
+          "Fields": [
+            {
+              "FieldName": "Sku",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": true
+        },
+        "derivedIndexName": "Sku_1"
+      },
+      {
+        "schemaName": "Warehouse",
+        "why": "Same.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the Warehouse schema definition>",
+          "Fields": [
+            {
+              "FieldName": "Code",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": true
+        },
+        "derivedIndexName": "Code_1"
+      },
+      {
+        "schemaName": "Supplier",
+        "why": "Same.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the Supplier schema definition>",
+          "Fields": [
+            {
+              "FieldName": "Code",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": true
+        },
+        "derivedIndexName": "Code_1"
+      },
+      {
+        "schemaName": "InventoryMovement",
+        "why": "Same.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the InventoryMovement schema definition>",
+          "Fields": [
+            {
+              "FieldName": "MovementNumber",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": true
+        },
+        "derivedIndexName": "MovementNumber_1"
+      },
+      {
+        "schemaName": "InventoryReservation",
+        "why": "Same.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the InventoryReservation schema definition>",
+          "Fields": [
+            {
+              "FieldName": "ReservationNumber",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": true
+        },
+        "derivedIndexName": "ReservationNumber_1"
+      },
+      {
+        "schemaName": "StockTransfer",
+        "why": "Same.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the StockTransfer schema definition>",
+          "Fields": [
+            {
+              "FieldName": "TransferNumber",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": true
+        },
+        "derivedIndexName": "TransferNumber_1"
+      },
+      {
+        "schemaName": "PurchaseOrder",
+        "why": "Same.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the PurchaseOrder schema definition>",
+          "Fields": [
+            {
+              "FieldName": "PurchaseOrderNumber",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": true
+        },
+        "derivedIndexName": "PurchaseOrderNumber_1"
+      }
+    ],
+    "tier2_deliberately_excluded": [
+      {
+        "schemaName": "ProductVariant",
+        "field": "Barcode",
+        "declaredUnique": true,
+        "recommendation": "DO NOT create this unique index.",
+        "why": "Barcode is optional in practice \u2014 most variants will have none. With no sparse option, a unique index permits exactly one variant without a barcode, so the second barcode-less variant you save is rejected. Either drop IsUniqueData from the field, or wait for a sparse/partial index option (see BLOCKS_FEATURE_SUGGESTIONS.md)."
+      }
+    ],
+    "tier3_performance": [
+      {
+        "schemaName": "WarehouseInventory",
+        "why": "The storefront availability lookup: useVariantAvailability() queries where VariantId in [...] on every listing and product page. Currently a collection scan.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the WarehouseInventory schema definition>",
+          "Fields": [
+            {
+              "FieldName": "VariantId",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": false
+        },
+        "derivedIndexName": "VariantId_1"
+      },
+      {
+        "schemaName": "InventoryReservation",
+        "why": "The lazy expiry sweep (sequence step S6) queries exactly this pair \u2014 there is no scheduler, so this runs client-triggered and needs to be cheap.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the InventoryReservation schema definition>",
+          "Fields": [
+            {
+              "FieldName": "Status",
+              "Direction": "ASC"
+            },
+            {
+              "FieldName": "ExpiresDate",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": false
+        },
+        "derivedIndexName": "Status_1_ExpiresDate_1"
+      },
+      {
+        "schemaName": "InventoryMovement",
+        "why": "Ledger history for one variant, newest first.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the InventoryMovement schema definition>",
+          "Fields": [
+            {
+              "FieldName": "VariantId",
+              "Direction": "ASC"
+            },
+            {
+              "FieldName": "OccurredDate",
+              "Direction": "DESC"
+            }
+          ],
+          "IsUnique": false
+        },
+        "derivedIndexName": "VariantId_1_OccurredDate_-1"
+      },
+      {
+        "schemaName": "Product",
+        "why": "Brand pages (sequence step S12).",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the Product schema definition>",
+          "Fields": [
+            {
+              "FieldName": "BrandId",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": false
+        },
+        "derivedIndexName": "BrandId_1"
+      },
+      {
+        "schemaName": "ProductVariant",
+        "why": "Every product detail page fans out to its variants.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the ProductVariant schema definition>",
+          "Fields": [
+            {
+              "FieldName": "ProductId",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": false
+        },
+        "derivedIndexName": "ProductId_1"
+      },
+      {
+        "schemaName": "PurchaseOrder",
+        "why": "Supplier detail / procurement views.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the PurchaseOrder schema definition>",
+          "Fields": [
+            {
+              "FieldName": "SupplierId",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": false
+        },
+        "derivedIndexName": "SupplierId_1"
+      },
+      {
+        "schemaName": "Order",
+        "why": "The customer order history in the account area (sequence step S10).",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the Order schema definition>",
+          "Fields": [
+            {
+              "FieldName": "CustomerId",
+              "Direction": "ASC"
+            },
+            {
+              "FieldName": "CreatedDate",
+              "Direction": "DESC"
+            }
+          ],
+          "IsUnique": false
+        },
+        "derivedIndexName": "CustomerId_1_CreatedDate_-1",
+        "requires": "U2"
+      },
+      {
+        "schemaName": "Order",
+        "why": "Backoffice Orders admin queue (sequence step S9).",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the Order schema definition>",
+          "Fields": [
+            {
+              "FieldName": "Status",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": false
+        },
+        "derivedIndexName": "Status_1",
+        "requires": "U2"
+      },
+      {
+        "schemaName": "Cart",
+        "why": "getActiveCart() \u2014 runs once per signed-in session already.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the Cart schema definition>",
+          "Fields": [
+            {
+              "FieldName": "CustomerId",
+              "Direction": "ASC"
+            },
+            {
+              "FieldName": "Status",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": false
+        },
+        "derivedIndexName": "CustomerId_1_Status_1",
+        "requires": "U2"
+      },
+      {
+        "schemaName": "CommerceCustomer",
+        "why": "One commerce profile per IAM user. ensureCommerceCustomer() does a get-or-create on this field, which races without the constraint.",
+        "request": {
+          "SchemaDefinitionItemId": "<ItemId of the CommerceCustomer schema definition>",
+          "Fields": [
+            {
+              "FieldName": "UserId",
+              "Direction": "ASC"
+            }
+          ],
+          "IsUnique": true
+        },
+        "derivedIndexName": "UserId_1",
+        "requires": "U2"
+      }
+    ]
+  }
+}
