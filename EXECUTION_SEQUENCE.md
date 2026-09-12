@@ -165,8 +165,18 @@ and waiting. Everything else in Track U is drafted as its step comes up.
       Verified: 6 further assertions, and the cart/checkout messages confirmed present in the
       default flags-off bundle — the point of the change.
 
-- [ ] **S8. Carry a real SKU on cart lines.** Removes the `OrderItem.Sku` →
-      `variantId`/`productId` fallback that `commerce.ts` currently documents against itself.
+- [x] **S8. Carry a real SKU on cart lines.** `CartLine.sku`, captured from the variant when
+      the line is added, and threaded into `OrderItem.Sku`, `CartItem.Sku` (both directions of
+      the server-cart round trip), `ReservationItem.Sku` and `InventoryMovement.Sku`. Removes
+      the `commerce.ts` fallback the code documented against itself.
+
+      Optional, not required, because carts persisted in localStorage before the field existed
+      are still in customers' browsers. Two details that follow from that: the cart merge
+      backfills a missing local SKU from the server copy rather than letting the local line's
+      absence win, and **the fallback behaviour differs on purpose** — an order line falls back
+      to the variant id (a line with no SKU is worse than one carrying an id) while a ledger
+      row does not (a variant id sitting in a column labelled `Sku` is a lie an auditor has no
+      way to spot, and the row already carries `VariantId`).
 
 ### Wave C — Commerce completion (written now, live on U2)
 

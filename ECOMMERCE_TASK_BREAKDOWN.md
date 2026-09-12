@@ -307,10 +307,12 @@ plan, role model, shared inventory module. Status against what's actually there:
       `insertOrder` mutation with price/tax/discount snapshots, an idempotency key generated
       once per checkout attempt and reused on retry, and the customer's IAM `itemId` as
       `CustomerId`. Inert until `COMMERCE_SCHEMAS_DRAFT.json` is imported — flip the env var
-      once it's live. One known gap carried over honestly rather than papered over:
-      `CartLine` doesn't carry a real SKU yet, so `OrderItem.Sku` falls back to
-      `variantId`/`productId` (noted in `commerce.ts`'s own comment) — fix once cart-provider
-      is extended to carry it, or once Cart itself moves server-side (still open below).
+      once it's live. **The SKU gap this entry used to carry is closed (S8):** `CartLine.sku` is captured
+      from the variant at add-to-cart and threaded into the order, the server cart (both
+      directions), reservations and the movement ledger. It stays optional for carts already
+      sitting in customers' localStorage, so the id fallback remains for order lines — but
+      deliberately not for ledger rows, where a variant id in a `Sku` column would mislead
+      an auditor.
 - [ ] **Coupons are a hardcoded array** — `src/lib/coupons.ts:1-6,13-16`
       (`DEMO_COUPONS`, two static codes), explicitly flagged in its own comment as a
       placeholder pending a real `Coupon` schema.
