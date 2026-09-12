@@ -261,8 +261,23 @@ and waiting. Everything else in Track U is drafted as its step comes up.
       `ImageWithFallback`, whose `fallback` is a required placeholder image; a logo's fallback
       is the initials block beside it.
 
-- [ ] **S13. Pagination / load-more**, replacing the fixed `pageSize: 100` fetch, with
-      server-side `where` filters wherever the Data Gateway can express them.
+- [x] **S13. Pagination / load-more.** `useEntityInfiniteList` in `hooks.ts`; `/products`
+      now pages 24 at a time and accumulates, replacing a fixed `pageSize: 100` fetch that
+      silently capped the catalog and looked like the whole of it.
+
+      **Accumulating rather than numbered pages, and that's forced rather than chosen:** the
+      facets come from embedded `Attributes` arrays the gateway can't filter on, price comes
+      from variants, sort has no confirmed input type, and the stock filter reads a different
+      schema. All of it is client-side, so numbered pages would mean facets describing only
+      the page you happen to be on, and a filter hiding most of page 2 while page 3 sits
+      unexamined. The footer states loaded against total, and when filters match nothing in
+      what's loaded but more pages exist it says *that* rather than "no products match".
+
+      The bigger fix was the one not in the task title: variants were being fetched with an
+      unbounded `pageSize: 500` across the **whole catalog** on every listing render. Now
+      scoped to the loaded products via `ProductId: { in: [...] }`. That, not the product cap,
+      was the real scaling problem on this page.
+
 - [ ] **S14. SEO metadata** — title/description/canonical/OG/JSON-LD. None exists anywhere.
 - [ ] **S15. Recently-viewed and basic recommendations.**
 - [ ] **S16. Embedded variant editor inside the Product form** (variants are a wholly separate

@@ -293,8 +293,11 @@ plan, role model, shared inventory module. Status against what's actually there:
 - [x] Home page with live Product/Category/ProductVariant-backed rails
       (`src/pages/HomePage.tsx`).
 - [x] Category browse + search + client-side facet/sort/price-range filtering
-      (`src/pages/ProductListingPage.tsx`) — filtering itself is real data, but computed
-      entirely client-side over a flat `pageSize: 100` fetch, not server-side filters.
+      (`src/pages/ProductListingPage.tsx`). Category, brand and search are real server-side
+      `where` filters; facets, price range, sort and the stock filter are client-side over the
+      loaded set, because the gateway can't filter embedded attribute arrays, can't sort
+      without a confirmed input type, and can't reach `WarehouseInventory` from a `Product`
+      query. Paged and accumulating since S13.
 - [x] Product detail page with gallery, variant selector, price/sale display
       (`src/pages/ProductDetailPage.tsx`).
 - [x] **Cart was `localStorage` only, guest-only, no server record.** **Server sync wired**,
@@ -348,8 +351,12 @@ plan, role model, shared inventory module. Status against what's actually there:
 - [x] **Brand pages — built** (sequence step S12). `/brands` (grid, inactive hidden, no-status
       treated as visible), `/brand/:slug` (header plus that brand's products), a `?brand=`
       filter on the listing page, a brand link on the product detail page, and a nav entry.
-- [ ] No pagination/infinite scroll (fixed `pageSize: 100`), no search suggestions, no SEO
-      metadata anywhere.
+- [x] **Pagination — built** (sequence step S13). `useEntityInfiniteList`: pages of 24 that
+      accumulate, since every facet/sort/price/stock filter on this page is client-side and
+      numbered pages would make them describe only the current page. Footer states loaded
+      against total. Variants are now fetched scoped to the loaded products rather than the
+      whole catalog — the actual scaling problem here.
+- [ ] No search suggestions, no SEO metadata anywhere.
 - [ ] No delivery/pickup ETA logic (static copy only).
 - [ ] No reviews/ratings — no schema, no UI.
 - [ ] No recommended/recently-viewed tracking.
