@@ -122,9 +122,30 @@ and waiting. Everything else in Track U is drafted as its step comes up.
       all-or-nothing on shortfall, record-before-stock, rollback closing the record, double
       release, order attachment leaving on-hand alone.
 
-- [ ] **S6. Lazy reservation-expiry sweep.** No scheduler exists (§6.3), so expiry is
-      client-triggered: on backoffice list load and on checkout entry. Builds on the
-      "Overdue" badge already shipped. *Runtime-blocked on U1.*
+- [x] **S6. Lazy reservation-expiry sweep.** `lib/blocks/reservation-sweep.ts`, mirrored in
+      both apps. Queries `InventoryReservation` where `Status = active` and `ExpiresDate` is
+      past, claims each one, releases its stock and stamps `ReleasedDate`. Triggered on
+      checkout entry (storefront, fire-and-forget) and on opening the reservation list
+      (backoffice, which then refetches and reports what it freed). Bounded to 25 per pass and
+      throttled to once a minute per session — it runs in front of a page load and must never
+      be what makes it slow.
+
+      **The claim is a compare-and-swap on the reservation's own `Status`**, and it carries
+      the whole design. Two clients sweeping at once would otherwise both release the same
+      lines, and since `releaseStock` clamps to whatever is currently reserved — not to this
+      reservation's share — the second release eats into stock held by *other people's*
+      reservations. That's a silent oversell arriving by a different route than the one the
+      CAS module guards. Filtering the claim on `Status: {eq: "active"}` means exactly one
+      sweeper gets `totalImpactedData === 1`.
+
+      Claim happens **before** release, which chooses the opposite failure: if the release
+      then fails, the record reads `expired` with no `ReleasedDate`. That's reported and
+      visible in the data, and strictly better than corrupting other reservations' stock.
+
+      *Runtime-blocked on U1.* Verified: 29 assertions across 8 scenarios, including two
+      sweepers racing. Removing the `Status` filter from the claim makes that scenario fail
+      with 2 units eaten from a neighbouring reservation — checked, not assumed.
+
 - [ ] **S7. Cart and checkout stock revalidation.** The storefront checks availability on the
       PDP and listing today, but not when a quantity is raised in the cart, and not at the
       moment of placement. Closes the honest gap noted in the breakdown's §3.

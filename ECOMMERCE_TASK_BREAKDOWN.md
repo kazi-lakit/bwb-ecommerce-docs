@@ -443,9 +443,16 @@ plan, role model, shared inventory module. Status against what's actually there:
       (`src/components/storefront/payment-partners-bar.tsx`) are static/decorative, wired to
       nothing. Per `ECOMMERCE_PLATFORM_ON_BLOCKS.md` §6.1/§6.3, this needs a PSP hosted
       checkout plus a manual staff-side confirmation screen in the backoffice — neither exists.
-- [ ] Reservation expiry (lazy/client-triggered per §6.3) — not started. The balance half is
-      ready now (`releaseStock` in `inventory-ops.ts`); what's missing is the sweep that finds
-      expired reservations and calls it. Sequence step S6.
+- [x] **Reservation expiry (lazy/client-triggered per §6.3) — built.**
+      `lib/blocks/reservation-sweep.ts` in both apps: finds `active` reservations past their
+      `ExpiresDate`, claims each with a compare-and-swap on its own `Status` (so two
+      concurrent sweepers can't both release the same lines — which would eat into other
+      reservations' stock, since `releaseStock` clamps to what's currently reserved rather
+      than to this reservation's share), releases the stock, then stamps `ReleasedDate`.
+      Claim-before-release deliberately trades a stranded-stock failure (reported, and visible
+      as expired-with-no-released-date) for never corrupting a neighbouring reservation.
+      Triggered on checkout entry and on opening the backoffice reservation list; bounded to
+      25 per pass and throttled to once a minute. Gated on `VITE_INVENTORY_WRITES_LIVE`.
 
 ---
 
