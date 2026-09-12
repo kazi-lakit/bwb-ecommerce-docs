@@ -97,8 +97,31 @@ and waiting. Everything else in Track U is drafted as its step comes up.
       stubbed, so it can't drift from what ships — confirmed by injecting a regression and
       watching it fail.
 
-- [ ] **S5. Wire reserve → place order → commit into storefront checkout**, with release on
-      failure and on abandonment. *Runtime-blocked on U1 + U2.*
+- [x] **S5. Reserve → place order → release, wired into checkout.**
+      `lib/blocks/checkout-inventory.ts` + `CheckoutPage.tsx`. Allocates cart lines to
+      warehouses (greedy: fullest warehouse first, splitting a line only when one can't cover
+      it — a deliberate placeholder until Phase 2's real allocation strategy), writes an
+      `InventoryReservation` record, holds the stock, and gives it back if order placement
+      fails. A sold-out line stops checkout with a message naming the item.
+
+      **Correction to this step as originally written:** it said "reserve → place order →
+      commit". Commit is wrong here. Committing reduces *on-hand*, which is what happens when
+      goods physically leave — a fulfillment action in the backoffice (S9/S24), not something
+      a storefront checkout can know has occurred. Placing an order leaves the reservation
+      `active`, repointed from the checkout attempt at the order it became.
+
+      The ordering inside the hold is the substance: **the reservation record is written
+      before the balances move.** There's no transaction spanning record, balances and order,
+      so the sequence is picked so every crash point leaves recoverable state — the worst case
+      becomes a record whose stock was never taken (harmless; the sweep releases zero) rather
+      than reserved stock with nothing naming it (stranded until someone reconciles the
+      ledger by hand).
+
+      *Runtime-blocked on U1 + U2.* Verified: 43 further assertions across 11 scenarios in
+      `npm run verify:inventory` — allocation preference and splitting, untracked variants,
+      all-or-nothing on shortfall, record-before-stock, rollback closing the record, double
+      release, order attachment leaving on-hand alone.
+
 - [ ] **S6. Lazy reservation-expiry sweep.** No scheduler exists (§6.3), so expiry is
       client-triggered: on backoffice list load and on checkout entry. Builds on the
       "Overdue" badge already shipped. *Runtime-blocked on U1.*

@@ -325,7 +325,11 @@ plan, role model, shared inventory module. Status against what's actually there:
       blocked. **Not yet covered:** the cart itself doesn't re-check stock on quantity
       increase, and checkout doesn't revalidate availability at the moment of order placement
       — real inventory *reservation* (§1.1/§4) is what actually prevents overselling; this is
-      storefront UX, not the enforcement mechanism.
+      storefront UX, not the enforcement mechanism. **The enforcement mechanism now exists:**
+      checkout allocates cart lines to warehouses and holds the stock via `inventory-ops.ts`
+      before placing the order, releasing it if placement fails (`checkout-inventory.ts`,
+      sequence step S5). Gated behind `VITE_INVENTORY_WRITES_LIVE` until §1.1 is imported.
+      Still open below: re-checking stock when a quantity is raised in the cart (S7).
 - [ ] Brand schema has generated metadata but zero call sites — no brand pages exist despite
       the schema being ready.
 - [ ] No pagination/infinite scroll (fixed `pageSize: 100`), no search suggestions, no SEO
@@ -371,7 +375,13 @@ plan, role model, shared inventory module. Status against what's actually there:
       everyone today. Verified by `npm run verify:inventory` (65 assertions, 19 scenarios,
       against a simulated gateway that enforces the CAS filter the way one Mongo `UpdateOne`
       would).
-- [ ] Allocation strategy logic — not started (no code references allocation of any kind).
+- [ ] Allocation strategy logic — a placeholder exists (`checkout-inventory.ts`'s
+      `allocateCartLines`: fullest warehouse first, split a line only when one warehouse can't
+      cover it, treat a variant with no inventory row as untracked rather than out of stock).
+      Deliberately the simplest defensible rule — it minimises how many warehouses a line
+      touches, which is right when nothing is known about shipping cost or customer location.
+      A real strategy (proximity, cost, split penalties) is still open; callers won't change
+      when it lands.
 - [x] **`StockTransfer` approval/dispatch/receive workflow — fixed**, matching the pattern
       just built for reservations. `stock-transfer-actions.ts`'s `stockTransferActions()` adds
       guided Approve (sets `ApprovedBy`/`ApprovedDate` for real, from the signed-in user, not
