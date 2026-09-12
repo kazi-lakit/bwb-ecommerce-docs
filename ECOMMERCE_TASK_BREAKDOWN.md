@@ -356,7 +356,13 @@ plan, role model, shared inventory module. Status against what's actually there:
       numbered pages would make them describe only the current page. Footer states loaded
       against total. Variants are now fetched scoped to the loaded products rather than the
       whole catalog — the actual scaling problem here.
-- [ ] No search suggestions, no SEO metadata anywhere.
+- [x] **SEO metadata — built** (sequence step S14). Per-page title/description/canonical/OG
+      via `lib/seo.ts`, schema.org `Product` + `BreadcrumbList` on product pages, `noindex` on
+      cart/checkout/wishlist/account and on search-results URLs (whose canonical drops the
+      query string). **Caveat recorded rather than glossed:** client-side tags are invisible to
+      social scrapers, so per-product link previews still don't work — that needs prerendering
+      (sequence step S28).
+- [ ] No search suggestions.
 - [ ] No delivery/pickup ETA logic (static copy only).
 - [ ] No reviews/ratings — no schema, no UI.
 - [ ] No recommended/recently-viewed tracking.

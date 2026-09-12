@@ -278,7 +278,31 @@ and waiting. Everything else in Track U is drafted as its step comes up.
       scoped to the loaded products via `ProductId: { in: [...] }`. That, not the product cap,
       was the real scaling problem on this page.
 
-- [ ] **S14. SEO metadata** — title/description/canonical/OG/JSON-LD. None exists anywhere.
+- [x] **S14. SEO metadata.** `lib/seo.ts` — `usePageMeta` sets title, description, canonical,
+      Open Graph and JSON-LD per page and undoes it on unmount, so leaving `/checkout` can't
+      leave the next page marked `noindex`. Product pages emit schema.org `Product` +
+      `BreadcrumbList`; cart/checkout/wishlist/`/account/*` are `noindex`; `/products?q=` is
+      `noindex` with a canonical that drops the query string, so search permutations don't
+      compete with the catalog. There was none of this anywhere before.
+
+      **The honest limit, written into the module itself:** this is a client-rendered SPA, so a
+      crawler gets `index.html` and everything else is applied afterwards by JavaScript.
+      Googlebot renders JS, so this is worth doing. **Most social scrapers don't** — Facebook,
+      LinkedIn, Slack, WhatsApp and X read raw HTML and never run the app, so **per-product
+      link previews do not work**, and no amount of client-side Open Graph will change that.
+      Every shared URL falls back to the baseline tags now in `index.html`. Fixing it properly
+      means prerendering at build time (compatible with the no-new-backend constraint — a
+      build step, not a service) or SSR. Added as **S28** rather than half-done here.
+
+      Two judgement calls in the structured data: **availability is omitted while the stock
+      query is in flight** rather than guessed, because an availability claim ends up beside a
+      price in a search result; and **JSON-LD is only emitted once the product has loaded**,
+      since structured data describing a placeholder is the version a crawler might cache.
+
+      Verified: 35 assertions running the real module against a minimal fake document —
+      including that navigating between pages replaces rather than duplicates tags, and that
+      unmounting restores the title without stripping the baseline metadata.
+
 - [ ] **S15. Recently-viewed and basic recommendations.**
 - [ ] **S16. Embedded variant editor inside the Product form** (variants are a wholly separate
       screen today).
@@ -306,6 +330,13 @@ Each of these is one `.json` + `.md` draft pair, then the feature on top.
       (S9). No payment SDK exists in either app today; both payment controls are decorative.
 
 ### Wave G — Phase 4, enterprise
+
+- [ ] **S28. Prerender the storefront's public routes at build time.** Follow-up from S14:
+      client-side Open Graph tags are invisible to every social scraper, so shared product and
+      brand links have no per-page preview. A build-time prerender of `/`, `/products`,
+      `/product/:slug`, `/brands` and `/brand/:slug` would put real tags in the HTML. It also
+      improves first paint. Needs a decision about how build-time catalog data is fetched, and
+      how often the site is rebuilt as the catalog changes — which is why it's its own step.
 
 - [ ] **S27.** `WarehouseZone`/`Bin` as real entities, `Lot`/`SerialNumber` with FIFO-FEFO,
       `StockCount` cycle counting, `CostLayer` valuation, `ReplenishmentRule`, approval
