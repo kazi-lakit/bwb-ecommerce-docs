@@ -412,12 +412,35 @@ Each of these is one `.json` + `.md` draft pair, then the feature on top.
 
 ### Wave G — Phase 4, enterprise
 
-- [ ] **S28. Prerender the storefront's public routes at build time.** Follow-up from S14:
-      client-side Open Graph tags are invisible to every social scraper, so shared product and
-      brand links have no per-page preview. A build-time prerender of `/`, `/products`,
-      `/product/:slug`, `/brands` and `/brand/:slug` would put real tags in the HTML. It also
-      improves first paint. Needs a decision about how build-time catalog data is fetched, and
-      how often the site is rebuilt as the catalog changes — which is why it's its own step.
+- [x] **S28. Prerender the storefront's public routes at build time.** `npm run build:seo`
+      writes a real HTML file per public route — `/`, `/products`, `/brands`, every
+      `/product/:slug` and `/brand/:slug` — with that route's metadata already in the markup,
+      plus `sitemap.xml` and `robots.txt`. This is the fix for what S14 could only document:
+      social scrapers read the raw response, so client-side Open Graph never reaches them.
+
+      **It fails loudly.** An empty catalog or a missing `VITE_SITE_ORIGIN` aborts rather than
+      emitting a site with no product pages — that deploy would look fine while every shared
+      link stayed broken, which is worse than not running it.
+
+      **It clears its own route directories first.** `vite build` leaves them in place, so
+      without that a product deleted from the catalog keeps a crawlable, shareable page long
+      after it's gone.
+
+      Two escaping rules that matter: attribute values are escaped (product names contain
+      quotes and ampersands), and JSON-LD has `</script` neutralised — a description containing
+      that sequence would otherwise close the script element early and spill markup into the
+      page. Build-time JSON-LD deliberately carries **no price or availability**: both change
+      far faster than the site is rebuilt, and a stale price in a search result is worse than
+      none. The runtime JSON-LD still carries them for crawlers that run JavaScript.
+
+      **Hosting note, or the whole step is undone:** the host must serve
+      `/product/oak-chair` from `product/oak-chair/index.html` *before* any SPA catch-all
+      rewrite.
+
+      Verified: 38 assertions on the pure helpers, plus an end-to-end run of the real script
+      against a stubbed gateway — confirming drafts and slugless products are skipped, escaping
+      holds, the sitemap is right, stale pages are removed on a catalog change, and both
+      failure modes abort with exit 1.
 
 - [ ] **S27.** `WarehouseZone`/`Bin` as real entities, `Lot`/`SerialNumber` with FIFO-FEFO,
       `StockCount` cycle counting, `CostLayer` valuation, `ReplenishmentRule`, approval

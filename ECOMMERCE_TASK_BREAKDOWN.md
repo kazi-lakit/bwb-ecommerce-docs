@@ -369,9 +369,10 @@ plan, role model, shared inventory module. Status against what's actually there:
 - [x] **SEO metadata — built** (sequence step S14). Per-page title/description/canonical/OG
       via `lib/seo.ts`, schema.org `Product` + `BreadcrumbList` on product pages, `noindex` on
       cart/checkout/wishlist/account and on search-results URLs (whose canonical drops the
-      query string). **Caveat recorded rather than glossed:** client-side tags are invisible to
-      social scrapers, so per-product link previews still don't work — that needs prerendering
-      (sequence step S28).
+      query string). **The caveat is now fixed too:** client-side tags are invisible to social
+      scrapers, so `npm run build:seo` (sequence step S28) prerenders every public route with
+      its metadata in the markup, plus `sitemap.xml` and `robots.txt`. Needs the gateway at
+      build time, and the host must serve those files before any SPA catch-all rewrite.
 - [ ] No search suggestions.
 - [ ] No delivery/pickup ETA logic (static copy only).
 - [ ] No reviews/ratings — no schema, no UI.
