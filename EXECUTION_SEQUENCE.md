@@ -28,7 +28,8 @@ inert until you import.
 | **U2** | Import the Commerce schemas (`CommerceCustomer`, `Cart`, `Order` + line DTOs) | `COMMERCE_SCHEMAS_DRAFT.json` + `.md` | Already-written cart/checkout/customer code; S5, S9, S10, S11 |
 | **U3** | Create the MongoDB indexes — REST-only, `POST /schemas/indexes` | `INDEX_PLAN.json` (24, tiered) | Trustworthy idempotent writes in S4/S5 |
 | **U4** | Create the backoffice IAM roles, then renarrow the `admin` placeholder policies | `IAM_ROLES_DRAFT.json` | Real permission gating beyond the built-in `admin` |
-| **U5** | Import schema batch 2 (quantity buckets + the `Version` retype) | `SCHEMA_BATCH_2.json` + `.md` | Each corresponding feature |
+| **U5** | Import schema batch 2 (quantity buckets + the `Version` retype) | `SCHEMA_BATCH_2.json` + `.md` |
+| **U6** | Import the `Coupon` schema | `COUPON_SCHEMA_DRAFT.json` + `.md` | Each corresponding feature |
 
 U1 and U2 are the two highest-leverage actions in the whole project and are already drafted
 and waiting. Everything else in Track U is drafted as its step comes up.
@@ -374,7 +375,33 @@ and waiting. Everything else in Track U is drafted as its step comes up.
 
 Each of these is one `.json` + `.md` draft pair, then the feature on top.
 
-- [ ] **S18. `Coupon` / `Promotion`** — replaces `src/lib/coupons.ts`'s two hardcoded demo codes.
+- [x] **S18. `Coupon`.** `COUPON_SCHEMA_DRAFT.json` + `.md` drafted, and `lib/coupons.ts`
+      rewritten from two hardcoded demo codes into a real lookup with real rules — date window,
+      minimum subtotal, percentage cap, usage limit, status — behind `VITE_COUPON_SCHEMA_LIVE`,
+      falling back to the demo codes until you import. Backoffice CRUD comes free once the
+      schema is live and `schema-meta.ts` is regenerated. 29 assertions on the rule evaluation.
+
+      **Drafting it surfaced something that outranks it, now §1.6 of the task breakdown: order
+      totals are written by the customer's browser and nothing verifies them.**
+      `Order.WriteAccessLevel = User`, `SubTotal`/`DiscountTotal`/`GrandTotal` all come from
+      `placeOrder`, and the gateway offers no hook, computed field or server-side validation
+      that could recompute them. A customer with devtools can order anything at any price.
+      That's inherent to the no-new-backend constraint, not a flaw in the draft — any client
+      that writes its own order can lie about it, and here the client is the only thing that
+      can write it.
+
+      So coupon rules are **presentation, not enforcement**, and `coupons.ts` says so at the
+      top. What actually catches a forged total is S9's manual payment confirmation — which
+      only works if the person can see what to compare, so the backoffice dialog now states the
+      amount and says plainly where it came from. That change is the substance of this step.
+
+      Two access decisions worth keeping: **Read is `User`, not Public** — the tenant key ships
+      in the storefront bundle, so a Public read lets anyone dump every coupon code. And that's
+      still not airtight: any signed-in customer can run an unfiltered `getCoupons`. There's no
+      way to evaluate a code without exposing the collection holding it, so treat codes as
+      semi-public — fine for "10% off this week", wrong for "£200 off, one customer". Both
+      limits are written up as platform gaps #16 and #17.
+
 - [ ] **S19. `Review` / `Rating`** — schema and UI, both absent.
 - [ ] **S20. `Favourite`** — makes the wishlist server-backed (last localStorage-only provider).
 - [ ] **S21. `TaxRate` / `ShippingRate`** — replaces the flat `DELIVERY_CHARGE = 120` constant.

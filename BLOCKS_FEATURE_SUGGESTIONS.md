@@ -186,6 +186,44 @@ not "is a reference", which is a separate naming problem worth untangling).
 
 ---
 
+### 16. [Data Gateway] Server-side computed or validated fields on write
+
+There is no way to make the server derive or check a field. No hook, no computed column, no
+validation beyond per-field regex/required rules that a client controls the inputs to.
+
+The consequence is not cosmetic. Any value a client writes is the value stored, so on a
+platform where the client is the only thing that can write, **no total, balance or derived
+figure can be trusted**. Concretely, in this project: an `Order`'s `GrandTotal` is whatever the
+storefront posts, and nothing can recompute it from `Items`. The same limitation is why a
+coupon's rules can only ever be advisory (item 17) and why `AvailableToSell` has to be stored
+and guarded by compare-and-swap rather than derived.
+
+**Ask:** a per-schema expression or hook evaluated server-side on write — even a restricted
+one (arithmetic over the document's own fields, with reject-on-mismatch) would cover the
+overwhelming majority of this. A full function-per-schema is the general answer, but a
+declarative "this field must equal this expression" would close the money-shaped hole.
+
+Without it, every monetary invariant on this platform is a detective control performed by a
+human after the fact, rather than a preventive one.
+
+### 17. [Data Gateway] Evaluate a rule without exposing the data behind it
+
+A coupon has to be validated somewhere. With no server-side evaluation, the only somewhere is
+the client, which means the client must be able to *read* the coupon collection — and a read
+it can filter, it can also run unfiltered. Any customer who can validate a code can enumerate
+every code.
+
+Field-level policies don't help: hiding `DiscountValue` from customers stops them computing the
+discount, which is the whole operation.
+
+**Ask:** a way to ask the gateway a yes/no question about data the caller can't read — a
+parameterised, server-evaluated query returning only a result, or a policy that permits a
+single-document fetch by exact key match while denying list access. The second is narrower and
+would be enough for coupons, licence keys, invite codes and anything else shaped like "prove
+you know the value".
+
+---
+
 ## Summary table
 
 | # | Priority | Service | One-line ask |
@@ -205,3 +243,5 @@ not "is a reference", which is a separate naming problem worth untangling).
 | 13 | P2 | Release | Fully-managed scheduled deployment type |
 | 14 | P1 | Data Gateway | Sparse / partial unique indexes (`IsSparse` on index create) |
 | 15 | P1 | Data Gateway | Indexable embedded + array sub-fields (dotted scalar paths) |
+| 16 | P0 | Data Gateway | Server-side computed/validated fields (no trustworthy totals without it) |
+| 17 | P1 | Data Gateway | Evaluate a rule without exposing the data behind it (exact-match read) |

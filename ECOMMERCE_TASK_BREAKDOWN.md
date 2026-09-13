@@ -140,6 +140,37 @@ reserve/commit/release — which is the mechanism that prevents overselling.
       `long` to `Int` anyway (`GraphQlTypeHelper.GetScalarType`), so `Int` is the correct
       spelling for this counter.
 
+### 1.6 Order totals are written by the customer's browser and nothing verifies them
+
+Found while drafting the Coupon schema (sequence step S18), and it outranks the feature that
+surfaced it.
+
+`Order.WriteAccessLevel = User` in `COMMERCE_SCHEMAS_DRAFT.json`, and `SubTotal`,
+`DiscountTotal` and `GrandTotal` are all sent by the storefront (`commerce.ts`'s `placeOrder`).
+The Data Gateway has no hook, no computed field and no server-side validation, so **there is no
+mechanism on this platform that can recompute a total from the line items and reject one that
+doesn't match.** A customer with devtools can place an order for anything at any price.
+
+This is inherent to the no-new-backend constraint rather than a mistake in the schema draft —
+any client that writes its own order can lie about it, and on Blocks the client is the only
+thing that can write it.
+
+- [x] **The existing mitigation made usable.** S9's manual payment confirmation is the control:
+      a person compares the order against what the payment provider actually received before
+      marking it Paid. That only works if they can see what to compare, so the backoffice
+      payment dialog now states the amount and says plainly that order totals come from the
+      customer's browser and aren't verified anywhere else.
+- [ ] **Decide whether that's enough before taking real money.** It is a detective control, not
+      a preventive one — it catches a forged total at confirmation, after fulfilment may already
+      have been picked. Options, none free: reconcile against the PSP's amount programmatically
+      once payment integration exists (S26), have the PSP be the source of truth for the amount
+      charged rather than the order, or accept the exposure for low-value goods.
+- [ ] **`Order.Edit` should not let customers touch monetary fields.** The draft's edit policy
+      is staff-only, which is right; keep it that way, and don't add a "customer can cancel
+      their own order" policy without scoping it to `Status` alone (field-level, not row-level).
+
+---
+
 ---
 
 ## 2. Phase 0 — Foundation
@@ -334,9 +365,12 @@ plan, role model, shared inventory module. Status against what's actually there:
       sitting in customers' localStorage, so the id fallback remains for order lines — but
       deliberately not for ledger rows, where a variant id in a `Sku` column would mislead
       an auditor.
-- [ ] **Coupons are a hardcoded array** — `src/lib/coupons.ts:1-6,13-16`
-      (`DEMO_COUPONS`, two static codes), explicitly flagged in its own comment as a
-      placeholder pending a real `Coupon` schema.
+- [x] **Coupons — real rules built, schema drafted** (sequence step S18). `lib/coupons.ts` now
+      looks up a `Coupon` record and evaluates date window, minimum subtotal, percentage cap,
+      usage limit and status, behind `VITE_COUPON_SCHEMA_LIVE` with the two demo codes as the
+      flag-off fallback. Schema in `COUPON_SCHEMA_DRAFT.json` (Read = `User`, not Public — a
+      Public read would let anyone dump every code). **These rules are presentation, not
+      enforcement** — see §1.6: a client that ignores them posts whatever discount it likes.
 - [x] **No inventory-availability check anywhere — fixed.** `WarehouseInventory` is a live
       schema (unlike Cart/Order), so this needed no feature flag and works today. See
       `src/lib/blocks/inventory.ts` (`useVariantAvailability`/`useSingleVariantAvailability`,
