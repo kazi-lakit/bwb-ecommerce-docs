@@ -409,7 +409,13 @@ plan, role model, shared inventory module. Status against what's actually there:
       build time, and the host must serve those files before any SPA catch-all rewrite.
 - [ ] No search suggestions.
 - [ ] No delivery/pickup ETA logic (static copy only).
-- [ ] No reviews/ratings — no schema, no UI.
+- [x] **Reviews/ratings — built** (sequence step S19). `REVIEW_SCHEMA_DRAFT.json` plus a
+      reviews section on the product page (average, histogram, list, submission form) behind
+      `VITE_REVIEW_SCHEMA_LIVE`. Moderation is enforced by a row-level **SCHEMA_FIELD** policy
+      (`Status == "approved"`) that the gateway compiles into a read filter — not by the
+      client — and self-approval is blocked by the project's first **CLS** policy on `Status`.
+      That CLS shape is now verified, which unblocks the field-policy follow-up §1.3 left
+      open.
 - [x] **Recently-viewed — built** (sequence step S15). `lib/recently-viewed.ts`, per-browser
       and anonymous, with rails on the home and product pages. Also **removed a false claim**:
       the product page's "Customer also Viewed these items" rail was the same category list as

@@ -109,3 +109,18 @@ hand-edited the local files.)
 Open `ecommerce-back-office`, go to `/admin/warehouse-inventory`, and try creating a record.
 Before this fix it should fail; after, it should succeed. Same check on
 `/admin/inventory-movement`.
+
+---
+
+## Update: the CLS follow-up is no longer blocked
+
+This document notes a column-level follow-up (hiding `ReorderPoint`/`ReorderQuantity`/
+`BinLocation`/`LastCountedDate` from public reads of `WarehouseInventory`) left undone for lack
+of a verified field-policy JSON shape to copy.
+
+**That shape is now verified and demonstrated** — see `REVIEW_SCHEMA_DRAFT.json`, where `Status`
+and `ModeratorNote` carry CLS policies, and the explanation in `REVIEW_SCHEMA_DRAFT.md`. In
+short: a field's `AccessPolicies` holds the same objects as `RowLevelPolicies` with
+`PolicyType: 1` instead of `0`, and the importer groups them **by `PolicyName` across fields**
+to recover which fields each policy covers. The `WarehouseInventory` field masking can be
+drafted the same way whenever you want it.

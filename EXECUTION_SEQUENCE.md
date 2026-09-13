@@ -29,7 +29,8 @@ inert until you import.
 | **U3** | Create the MongoDB indexes — REST-only, `POST /schemas/indexes` | `INDEX_PLAN.json` (24, tiered) | Trustworthy idempotent writes in S4/S5 |
 | **U4** | Create the backoffice IAM roles, then renarrow the `admin` placeholder policies | `IAM_ROLES_DRAFT.json` | Real permission gating beyond the built-in `admin` |
 | **U5** | Import schema batch 2 (quantity buckets + the `Version` retype) | `SCHEMA_BATCH_2.json` + `.md` |
-| **U6** | Import the `Coupon` schema | `COUPON_SCHEMA_DRAFT.json` + `.md` | Each corresponding feature |
+| **U6** | Import the `Coupon` schema | `COUPON_SCHEMA_DRAFT.json` + `.md` |
+| **U7** | Import the `Review` schema, then **verify both policies actually bite** | `REVIEW_SCHEMA_DRAFT.json` + `.md` | Each corresponding feature |
 
 U1 and U2 are the two highest-leverage actions in the whole project and are already drafted
 and waiting. Everything else in Track U is drafted as its step comes up.
@@ -351,10 +352,18 @@ and waiting. Everything else in Track U is drafted as its step comes up.
 
       The dashboard carried a standing note that these numbers needed server-side aggregation
       and so weren't shown. **Half right, and the half that was wrong is the interesting part:**
-      aggregation is genuinely missing, but the blocker for *this* question is narrower and
-      permanent — "is `AvailableToSell` below **this row's own** `ReorderPoint`" compares two
-      fields of one document, which a `where` clause can't express at any scale, aggregation or
-      not. Counting a bounded page client-side answers it.
+      aggregation is genuinely missing, but the blocker for *this* question is narrower — "is
+      `AvailableToSell` below **this row's own** `ReorderPoint`" compares two fields of one
+      document, which the GraphQL `where` input can't express: its operators compare a field to
+      a literal. Counting a bounded page client-side answers it.
+
+      *(Refined while drafting S19: the **policy** engine does support field-to-field
+      comparison — `DataAccessPolicyHelper` builds a Mongo `$expr` for a SCHEMA_FIELD vs
+      SCHEMA_FIELD rule. That doesn't help here, because a policy constrains what everyone may
+      see rather than answering a question on demand; a "low stock" policy would hide healthy
+      rows from every caller. The original wording said no filter could express it at any
+      scale, which was too strong — the query surface can't, the policy layer can, and neither
+      gives you a low-stock query.)*
 
       So the panel **states its own bound**: when there are more rows than it examined it says
       how many of how many, because a count that silently covered a third of the warehouse
@@ -402,7 +411,36 @@ Each of these is one `.json` + `.md` draft pair, then the feature on top.
       semi-public — fine for "10% off this week", wrong for "£200 off, one customer". Both
       limits are written up as platform gaps #16 and #17.
 
-- [ ] **S19. `Review` / `Rating`** — schema and UI, both absent.
+- [x] **S19. `Review` / `Rating`.** `REVIEW_SCHEMA_DRAFT.json` + `.md`, `lib/blocks/reviews.ts`,
+      and a reviews section on the product page — average, star histogram, list, and a
+      submission form for signed-in customers. Behind `VITE_REVIEW_SCHEMA_LIVE`. Backoffice
+      moderation comes free from the generic screens after import. 16 assertions.
+
+      **This is the first schema here to put the policy engine to real work**, and both
+      mechanisms were verified against `blocks-data`'s source rather than assumed:
+
+      *Moderation is enforced by a row-level policy, not by the client.* `Read` is `Custom`
+      with a **SCHEMA_FIELD** rule (`Status == "approved"`), which
+      `DataAccessPolicyHelper.EvaluateRule` compiles into a Mongo filter on every read. The
+      obvious alternative — Public read, filter in the client — leaves the rejected abusive
+      review readable by anyone with the tenant key, and that key ships in the storefront
+      bundle. `reviews.ts` deliberately doesn't re-filter, so nobody mistakes the client for
+      the control.
+
+      *Self-approval is blocked by the project's first CLS policy.* `Write` is `User`, so a
+      customer could otherwise post `Status: "approved"` and publish themselves — the same
+      client-trust problem as §1.6, but fixable here because it's field-scoped. **This
+      unblocks the CLS follow-up `P0_POLICY_FIXES.md` left open for lack of a verified shape:**
+      a field's `AccessPolicies` holds the same objects as `RowLevelPolicies` with
+      `PolicyType: 1`, and policies are **grouped by `PolicyName` across fields** to recover
+      which fields they cover (`SchemaImportMapping.MapToClsPolicies`) — non-obvious, and easy
+      to get wrong.
+
+      Three things are modelled but not enforced, said in the draft rather than left to be
+      discovered: `IsVerifiedPurchase` (a client-set boolean is worth nothing),
+      `HelpfulCount`, and one-review-per-customer (UI only until a compound unique index
+      exists).
+
 - [ ] **S20. `Favourite`** — makes the wishlist server-backed (last localStorage-only provider).
 - [ ] **S21. `TaxRate` / `ShippingRate`** — replaces the flat `DELIVERY_CHARGE = 120` constant.
 - [x] **S22. Bulk import/export.** `lib/csv.ts` (an RFC 4180 codec), `lib/blocks/bulk.ts`
