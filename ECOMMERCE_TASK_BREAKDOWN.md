@@ -349,9 +349,12 @@ plan, role model, shared inventory module. Status against what's actually there:
       sync on every change via a debounced create/update against a server `Cart` record. Off
       by default, so nothing changes until the flag flips. See `lib/blocks/commerce.ts`
       (`getActiveCart`/`createRemoteCart`/`updateRemoteCart`) and `cart-provider.tsx`.
-- [ ] **Wishlist is still localStorage-only** — `src/components/providers/wishlist-provider.tsx:16-18`,
-      same pattern the cart used to have. Not wired in this pass; same approach would apply
-      if a `Favourite`/`Wishlist` schema is added to the Commerce draft.
+- [x] **Wishlist — server sync built** (sequence step S20). `FAVOURITE_SCHEMA_DRAFT.json` plus
+      per-item sync in `wishlist-provider.tsx`, the same shape as the cart's: localStorage for
+      guests and instant load, server rows so it follows the customer between devices. Behind
+      `VITE_FAVOURITE_SCHEMA_LIVE`. One row per favourite rather than an array (arrays can't be
+      indexed and can't be partially removed), owner-scoped by policy, and no admin read —
+      staff browsing wishlists should be a decision, not a default.
 - [x] **Checkout order placement is fully simulated** — was
       `src/pages/CheckoutPage.tsx:126-144`, a `setTimeout(..., 500)` with no persisted record.
       **Real placement wired**, gated behind `VITE_COMMERCE_SCHEMAS_LIVE` (default off, so

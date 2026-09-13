@@ -30,7 +30,8 @@ inert until you import.
 | **U4** | Create the backoffice IAM roles, then renarrow the `admin` placeholder policies | `IAM_ROLES_DRAFT.json` | Real permission gating beyond the built-in `admin` |
 | **U5** | Import schema batch 2 (quantity buckets + the `Version` retype) | `SCHEMA_BATCH_2.json` + `.md` |
 | **U6** | Import the `Coupon` schema | `COUPON_SCHEMA_DRAFT.json` + `.md` |
-| **U7** | Import the `Review` schema, then **verify both policies actually bite** | `REVIEW_SCHEMA_DRAFT.json` + `.md` | Each corresponding feature |
+| **U7** | Import the `Review` schema, then **verify both policies actually bite** | `REVIEW_SCHEMA_DRAFT.json` + `.md` |
+| **U8** | Import the `Favourite` schema, then **verify the owner isolation** | `FAVOURITE_SCHEMA_DRAFT.json` + `.md` | Each corresponding feature |
 
 U1 and U2 are the two highest-leverage actions in the whole project and are already drafted
 and waiting. Everything else in Track U is drafted as its step comes up.
@@ -441,7 +442,28 @@ Each of these is one `.json` + `.md` draft pair, then the feature on top.
       `HelpfulCount`, and one-review-per-customer (UI only until a compound unique index
       exists).
 
-- [ ] **S20. `Favourite`** — makes the wishlist server-backed (last localStorage-only provider).
+- [x] **S20. `Favourite`.** `FAVOURITE_SCHEMA_DRAFT.json` + `.md`, `lib/blocks/favourites.ts`,
+      and `wishlist-provider.tsx` rewritten to sync per-item rows — the last localStorage-only
+      provider in the storefront. Same shape as the cart's sync: localStorage stays the
+      persistence layer, the server copy makes it follow the customer between devices. Behind
+      `VITE_FAVOURITE_SCHEMA_LIVE`. 14 assertions.
+
+      **One row per favourite, not an array on `CommerceCustomer`** — the array is worse on
+      both counts that matter: an embedded array can't be indexed or filtered on, so "which
+      customers favourited this product" would be unanswerable; and removing one entry means
+      rewriting the whole array, making last-writer-wins the real behaviour across two tabs.
+      That's the address-book limitation from S10, tolerable there and not here.
+
+      **No admin read policy, deliberately.** Read and customer-delete are owner-scoped
+      SCHEMA_FIELD vs AUTH rules compiled into data filters, so isolation is enforced rather
+      than merely displayed. Staff get delete (erasure, spam) but not read: a wishlist is a
+      statement about someone's intentions, and staff browsing it should be an explicit
+      decision, not a default nobody chose.
+
+      **A merge never removes.** An item saved on a phone and missing locally means "not synced
+      here", not "removed", and there's no per-item timestamp to distinguish them — of the two
+      possible mistakes, deleting something someone saved is the one they'd mind.
+
 - [ ] **S21. `TaxRate` / `ShippingRate`** — replaces the flat `DELIVERY_CHARGE = 120` constant.
 - [x] **S22. Bulk import/export.** `lib/csv.ts` (an RFC 4180 codec), `lib/blocks/bulk.ts`
       (row ↔ payload) and an Import / export drawer on every entity list. Export honours the
