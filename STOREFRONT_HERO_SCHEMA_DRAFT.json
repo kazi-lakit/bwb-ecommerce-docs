@@ -1,0 +1,83 @@
+{
+  "schemaName": "StorefrontHero",
+  "schemaType": 1,
+  "fields": [
+    {
+      "name": "PlacementKey",
+      "type": "String",
+      "description": "Stable storefront placement identifier, such as home-primary.",
+      "isUniqueData": true
+    },
+    {
+      "name": "Status",
+      "type": "String",
+      "description": "Publishing status: draft or published."
+    },
+    {
+      "name": "Eyebrow",
+      "type": "String",
+      "description": "Short collection or campaign label above the heading."
+    },
+    {
+      "name": "Heading",
+      "type": "String",
+      "description": "Primary homepage hero heading."
+    },
+    {
+      "name": "Description",
+      "type": "String",
+      "description": "Supporting homepage hero copy."
+    },
+    {
+      "name": "PrimaryCtaLabel",
+      "type": "String",
+      "description": "Primary call-to-action label."
+    },
+    {
+      "name": "PrimaryCtaHref",
+      "type": "String",
+      "description": "Internal storefront path for the primary call to action."
+    },
+    {
+      "name": "SecondaryCtaLabel",
+      "type": "String",
+      "description": "Optional secondary call-to-action label."
+    },
+    {
+      "name": "SecondaryCtaHref",
+      "type": "String",
+      "description": "Internal storefront path for the secondary call to action."
+    },
+    {
+      "name": "ImageUrl",
+      "type": "String",
+      "description": "Public Blocks Storage URL for the hero image."
+    },
+    {
+      "name": "ImageFileId",
+      "type": "String",
+      "description": "Blocks Storage file identifier for the hero image."
+    },
+    {
+      "name": "ImageAltText",
+      "type": "String",
+      "description": "Accessible alternative text for the hero image."
+    },
+    {
+      "name": "HighlightOne",
+      "type": "String",
+      "description": "First reassurance label below the hero actions."
+    },
+    {
+      "name": "HighlightTwo",
+      "type": "String",
+      "description": "Second reassurance label below the hero actions."
+    },
+    {
+      "name": "HighlightThree",
+      "type": "String",
+      "description": "Third reassurance label below the hero actions."
+    }
+  ],
+  "collectionName": "blx_StorefrontHeroes"
+}

@@ -107,11 +107,67 @@ No item here is blocking — the project ships without any of them. They're rank
 
 ---
 
-### 10. [Notification / Notifier] Clarify and expose the workflow-engine trigger path
+### 10. [Workflow / blocks-logic] Three execution-path bugs block real automation, once authored via the raw API
 
-**What's missing:** the Data Gateway already publishes every insert/update/delete as a `DataChangeEvent` to a queue explicitly documented as feeding a workflow engine (`blocks-utilities-net`) — but that engine isn't reachable from the `blocks` CLI or the `@seliseblocks/client` SDK in this workspace, so its availability and authoring model for a given project can't be confirmed or designed against.
+**Update, 2026-09-13 — this item's original "can't be confirmed" framing is now resolved, with
+findings that raise a new, more specific concern.** The workflow engine (`blocks-logic`,
+`https://logic.seliseblocks.com/api/Workflow/*`) **is** reachable and project-authorable — it
+has no `blocks` CLI or SDK wrapper, but a real bearer token (minted via a project-scoped
+`auth client-credentials` M2M credential + a standard OAuth2 client-credentials grant against
+the tenant's IAM token endpoint) plus the documented raw REST surface is enough to create,
+update, publish, and trigger a workflow end to end. That part works.
 
-**Why it matters:** if it's available and project-authorable, a meaningful share of this project's "run this in response to a data change" needs (low-stock alerts, order-confirmed notifications, replenishment triggers) move there directly — no client-side polling, no manual trigger, no new capability needed from item 1 at all for these specific cases.
+**What's actually blocking this project's "low-stock alert" / "reservation-expiry sweep"
+use cases is three separate, confirmed execution bugs**, found by building and running real
+test workflows (each deleted after use — nothing left running against `blocks-shop`):
+
+1. **`dataAction` (`actionType: "getData"`) sends the wrong HTTP verb.** The confirmed-correct
+   Data Gateway GraphQL endpoint for this tenant is `POST https://blocksapi.slsblx.com/data/v4/gateway`
+   (verified directly: a plain `POST` with a GraphQL body returns `200`). Every `dataAction`
+   node configuration tried against that same URL — guided `getData` mode, `rawQueryMode: true`
+   with an explicit query, with or without an `apiBaseUrl`/`projectShortKey` combination —
+   returns `405 Method Not Allowed`. No parameter found controls the verb.
+2. **`httpRequest`'s custom `headers` parameter can't carry `Content-Type`.** Passing it there
+   throws a raw, unhandled .NET exception straight into the execution result:
+   `"Misused header name, 'Content-Type'. Make sure request headers are used with
+   HttpRequestMessage, response headers with HttpResponseMessage, and content headers with
+   HttpContent objects."` — the node adds every entry in `headers` to the request's header
+   collection without separating true request headers from content headers. Leaving it out and
+   relying on `bodyContentType: "json"` to set it automatically doesn't work either — the
+   target API then 400s on the body, implying the automatic Content-Type isn't actually
+   reaching the outbound request.
+3. **Anonymous (production, non-`webhook-test`) webhook executions lose tenant context for at
+   least the `sendMail` node.** A workflow with a plain `webhook` trigger (`authType: "none"`)
+   → `sendMail` runs successfully when fired through the *authenticated* `webhook-test` path,
+   but the identical graph fails with `"Tenant ID cannot be null or empty. (Parameter
+   'tenantId')"` when fired through its real, published, anonymous webhook URL — even with the
+   tenant id already present in the URL path, an `x-blocks-key` header added to the call, and
+   `organizationId: "default"` set on the webhook node's own parameters. This is the one that
+   matters most: it means a workflow triggered by anything *other than* an authenticated editor
+   session (a cron-driven `Scheduler` webhook call, an external system's webhook) can't reliably
+   run a `sendMail` node — i.e. exactly the unattended, scheduled use case this item exists for.
+
+**A related, separate documentation gap, also found in passing:** `PublishNewVersion` does
+**not** auto-create a backing cron job for a `schedule`-category trigger node the way
+`node-graph-schema.md` (reconstructed from source, not live-tested) describes — confirmed via
+`POST /api/Scheduler/GetSchedules` showing `totalCount: 0` after publishing. The real recurring
+mechanism is a **separate** `Scheduler` service (`/api/Scheduler/CreateSchedule`) that calls a
+webhook URL on a cron expression — which then runs straight into bug 3 above.
+
+**Why it matters:** with all three fixed, this item's original promise holds — low-stock
+alerts, reservation-expiry sweeps, and similar periodic/webhook-driven automations become
+buildable without any new backend service, which is exactly what this project's hard
+constraint needs. Right now, none of them can be built reliably through the raw API in a way
+that survives being triggered unattended.
+
+**Current mitigation:** none needed yet — nothing in the shipped app depends on Workflow.
+`reservation-sweep.ts`'s lazy, client-triggered check and the on-demand low-stock report both
+still stand as-is.
+
+**What would satisfy this:** fix the three execution bugs above (or, if they turn out to be
+config, not code — this project's own attempts could not find the missing parameter, so this
+needs the platform team's own source-level look), and correct or verify
+`node-graph-schema.md`'s claim about publish-time schedule creation.
 
 ---
 
@@ -237,7 +293,7 @@ you know the value".
 | 7 | P1 | Data Gateway | TTL index support |
 | 8 | P1 | Data Gateway | Reliable/outboxed `DataChangeEvent` delivery |
 | 9 | P1 | IAM | Documented custom claims usable in RLS |
-| 10 | P1 | Notification / Notifier | Clarify + expose workflow-engine trigger path |
+| 10 | P0 | Workflow / blocks-logic | Fix 3 execution bugs blocking unattended automation (wrong verb, header exception, anonymous-webhook tenant loss) |
 | 11 | P2 | Data Gateway | Aggregation primitives (`$group`/`$sum`/`$avg`) |
 | 12 | P2 | Data Gateway | Relevance-ranked full-text search + facet counts |
 | 13 | P2 | Release | Fully-managed scheduled deployment type |

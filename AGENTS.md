@@ -89,8 +89,13 @@ explaining what it is and the precise `blocks` CLI steps to import it) — see
 `blocks login`, `blocks use <tenantId>`, or any mutating `blocks data`/`blocks iam` command
 for this project without being asked to.
 
-The e-commerce project's tenant is `D2b2b7d30b27f41bdb97833319e639e3f` (project "bwb") — the
-`blocks` CLI may be pointed at a different project by default; check before running anything.
+The e-commerce project's tenant is `D9d1f667bf6a940828c66e196544e536a` (project "blocks-shop")
+— the `blocks` CLI may be pointed at a different project by default; check before running
+anything. An earlier attempt used `D2b2b7d30b27f41bdb97833319e639e3f`; that project is not
+reachable from this account and is abandoned — don't `blocks use` it. As of 2026-09-13,
+`blocks-shop` already has two OIDC clients (one per app), `admin`/`customer` IAM roles (no
+permissions attached yet), and two invited test users — see the e-commerce project memory for
+the full rundown before recreating any of it.
 
 ## Condensed Blocks technical guidance
 
